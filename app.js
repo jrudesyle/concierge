@@ -22,9 +22,6 @@ const connectionDot = document.querySelector('#connectionStatus .dot');
 const connectionText = document.querySelector('#connectionStatus span:last-child');
 const clockEl = $('clock');
 const notifBtn = $('notifTestBtn');
-const agentNameInput = $('agentNameInput');
-const agentMsgInput = $('agentMsgInput');
-const sendUpdateBtn = $('sendUpdateBtn');
 const themeSelect = $('themeSelect');
 const sidebarToggle = $('sidebarToggle');
 const addAgentBtn = $('addAgentBtn');
@@ -71,7 +68,7 @@ function createShellPane() {
       <button class="shell-clear-btn" id="shellClearBtn">×</button>
     </div>
   `;
-  main.insertBefore(pane, main.querySelector('.agent-input-bar'));
+  main.appendChild(pane);
 
   // Bind shell input
   const shellInput = document.getElementById('shellInput');
@@ -213,21 +210,54 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ── Markdown Renderer ──
+function renderMarkdown(text) {
+  if (!text) return '';
+  var escaped = escapeHtml(text);
+  // Code blocks: ```lang\ncode\n```
+  escaped = escaped.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, function(m, c) {
+    return '<pre><code>' + c + '</code></pre>';
+  });
+  escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, function(m, lang, code) {
+    return '<pre><code class="lang-' + escapeHtml(lang) + '">' + code.trim() + '</code></pre>';
+  });
+  // Inline code
+  escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
+  escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  // Links
+  escaped = escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Horizontal rules
+  escaped = escaped.replace(/^---$/gm, '<hr>');
+  // Unordered lists (lines starting with - or *)
+  escaped = escaped.replace(/^( *)[*-] +(.*)$/gm, '$1• $2');
+  // Line breaks
+  escaped = escaped.replace(/\n/g, '<br>');
+  return escaped;
+}
+
 // ── Sidebar Toggle ──
 sidebarToggle.addEventListener('click', () => {
-  const isMobile = window.innerWidth <= 600;
+  const isMobile = window.innerWidth <= 700;
   if (isMobile) {
     sidebarEl.classList.toggle('open');
+    overlayEl.classList.toggle('open', sidebarEl.classList.contains('open'));
   } else {
     sidebarEl.classList.toggle('collapsed');
   }
 });
-// Close sidebar on mobile when clicking outside
-main.addEventListener('click', () => {
-  if (window.innerWidth <= 600 && sidebarEl.classList.contains('open')) {
+// Close sidebar on mobile when clicking outside or on overlay
+const overlayEl = document.getElementById('sidebarOverlay');
+function closeSidebar() {
+  if (window.innerWidth <= 700 && sidebarEl.classList.contains('open')) {
     sidebarEl.classList.remove('open');
+    if (overlayEl) overlayEl.classList.remove('open');
   }
-});
+}
+main.addEventListener('click', closeSidebar);
+if (overlayEl) overlayEl.addEventListener('click', closeSidebar);
 
 // ── Notifications ──
 async function enableNotifications() {
@@ -410,7 +440,7 @@ function createGlobalPane() {
       <div class="empty-state"><p>Loading...</p></div>
     </div>
   `;
-  main.insertBefore(pane, main.querySelector('.agent-input-bar'));
+  main.appendChild(pane);
 
   pane.querySelector('.btn-reload-global').addEventListener('click', loadGlobalFiles);
 }
@@ -552,7 +582,8 @@ function renderPanes() {
         <div class="chat-box">
           <div class="chat-messages" id="chatMsgs-${a.id}">
             <div class="chat-empty">
-              <p>Ask a question about this agent's work.</p>
+              <div class="big-icon">💬</div>
+              <p>Start a conversation — ask questions, review code, or get help.</p>
             </div>
           </div>
           <div class="chat-input-bar">
@@ -583,7 +614,7 @@ function renderPanes() {
       </div>
     `;
 
-    main.insertBefore(pane, main.querySelector('.agent-input-bar'));
+    main.appendChild(pane);
   });
 
   // Bind agent sub-tabs
@@ -716,7 +747,7 @@ function renderChat(agentId) {
 
   const msgs = agentChats[agentId] || [];
   if (msgs.length === 0) {
-    container.innerHTML = '<div class="chat-empty"><p>Ask a question about this agent\'s work.</p></div>';
+    container.innerHTML = '<div class="chat-empty"><div class="big-icon">💬</div><p>Start a conversation about <strong>' + (escapeHtml(agentId) || 'this project') + '</strong> — ask questions, review status, or get help.</p></div>';
     return;
   }
 
@@ -724,7 +755,12 @@ function renderChat(agentId) {
     if (m.role === 'typing') {
       return '<div class="chat-msg chat-msg-assistant"><div class="chat-typing">Thinking...</div></div>';
     }
-    return '<div class="chat-msg chat-msg-' + m.role + '"><div class="chat-msg-content">' + escapeHtml(m.content) + '</div></div>';
+    var time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    var content = m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content);
+    return '<div class="chat-msg chat-msg-' + m.role + '">' +
+      '<div class="chat-msg-content">' + content + '</div>' +
+      (time ? '<div class="chat-msg-time">' + time + '</div>' : '') +
+      '</div>';
   }).join('');
 
   container.scrollTop = container.scrollHeight;
@@ -737,9 +773,9 @@ async function handleChatSend(agentId) {
   if (!msg) return;
   input.value = '';
 
-  // Add user message
+  // Add user message with timestamp
   if (!agentChats[agentId]) agentChats[agentId] = [];
-  agentChats[agentId].push({ role: 'user', content: msg });
+  agentChats[agentId].push({ role: 'user', content: msg, timestamp: Date.now() });
   // Add typing indicator
   agentChats[agentId].push({ role: 'typing', content: '' });
   renderChat(agentId);
@@ -910,36 +946,6 @@ async function deleteAgent(agentId) {
   }
 }
 
-// ── Manual update ──
-async function handleManualUpdate() {
-  const agent = agentNameInput.value.trim();
-  const msg = agentMsgInput.value.trim();
-  if (!agent || !msg) {
-    showToast('⚠️', 'Missing Fields', 'Enter both agent name and status message.');
-    return;
-  }
-  const stateMatch = msg.match(/\[(done|running|error|pending)\]/i);
-  const taskState = stateMatch ? stateMatch[1].toLowerCase() : 'running';
-  const cleanLabel = msg.replace(/\[(done|running|error|pending)\]/gi, '').trim();
-
-  await apiFetch('/api/update', {
-    method: 'POST',
-    body: JSON.stringify({
-      agent,
-      agentLabel: agent,
-      subtask: {
-        id: `manual-${Date.now()}`,
-        label: cleanLabel || msg,
-        state: taskState,
-        icon: taskState === 'error' ? '❌' : taskState === 'done' ? '✅' : '🔄',
-      }
-    }),
-  });
-  agentNameInput.value = '';
-  agentMsgInput.value = '';
-  showToast('📨', `Update sent to ${agent}`, cleanLabel || msg);
-}
-
 // ── SSE ──
 function connectSSE() {
   if (sse) sse.close();
@@ -1061,7 +1067,7 @@ function connectSSE() {
       if (chat) {
         const typingIdx = chat.findIndex(m => m.role === 'typing');
         if (typingIdx >= 0) chat.splice(typingIdx, 1);
-        chat.push({ role: 'assistant', content: response });
+        chat.push({ role: 'assistant', content: response, timestamp: Date.now() });
         // Only re-render if this agent's pane is visible
         if (currentTab === agentId) {
           renderChat(agentId);
@@ -1093,8 +1099,6 @@ if ('serviceWorker' in navigator) {
   connectSSE();
 
   // Manual update events
-  sendUpdateBtn.addEventListener('click', handleManualUpdate);
-  agentMsgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualUpdate(); });
 
   // Notif test
   notifBtn.addEventListener('click', () => {

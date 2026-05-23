@@ -3,3 +3,4 @@ node_modules/
 *.log
 state.json
 screenshot.png
+app.js.bak

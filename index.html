@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="/assets/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1779560485" />
+  <link rel="stylesheet" href="style.css?v=1779561203" />
 </head>
 <body data-theme="clean">
   <div class="app-layout">
@@ -26,16 +26,10 @@
       <div class="header-right">
         <div class="theme-selector">
           <select id="themeSelect">
-            <option value="cyber">Cyber</option>
+            <option value="clean" selected>Clean Light</option>
             <option value="nord">Nord</option>
             <option value="dracula">Dracula</option>
-            <option value="forest">Forest</option>
-            <option value="matrix">Matrix</option>
-            <option value="retro">Retro</option>
-            <option value="solarized">Solarized</option>
-            <option value="clean" selected>Clean Light</option>
-            <option value="sunset">Sunset</option>
-            <option value="mono">Monochrome</option>
+            <option value="cyber">Cyber</option>
           </select>
         </div>
         <div class="connection-status" id="connectionStatus">
@@ -67,14 +61,6 @@
       <main class="dashboard-main" id="dashboardMain">
         <!-- Tab panes injected by JS -->
 
-        <!-- Global agent input bar -->
-        <div class="agent-input-bar">
-          <div class="input-row">
-            <input type="text" id="agentNameInput" placeholder="Project name" class="input-agent" />
-            <input type="text" id="agentMsgInput" placeholder='Status update... (append [done] [error] [running] [pending])' class="input-msg" />
-            <button id="sendUpdateBtn" class="btn-primary">Send Update</button>
-          </div>
-        </div>
       </main>
     </div>
   </div>
@@ -82,6 +68,9 @@
   <!-- Toast container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="app.js?v=1779560485"></script>
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <script src="app.js?v=1779561203"></script>
 </body>
 </html>
