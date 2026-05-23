@@ -388,17 +388,16 @@ function selectAgent(agentId) {
     el.classList.toggle('active', el.dataset.agent === agentId);
   });
 
-  // Update pane visibility and reset to Chat tab (for projects)
+  // Update pane visibility and close any open info panels
   document.querySelectorAll('.tab-pane').forEach(p => {
     const isThis = p.id === `pane-${agentId}`;
     p.classList.toggle('active', isThis);
-    if (isThis && agentId !== '_shell' && agentId !== '_global') {
-      p.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('agent-tab-active'));
-      p.querySelectorAll('.agent-tab-content').forEach(tc => tc.classList.remove('agent-tab-content-active'));
-      const chatBtn = p.querySelector('.agent-tab[data-tab="chat"]');
-      const chatContent = p.querySelector('#tabChat-' + agentId);
-      if (chatBtn) chatBtn.classList.add('agent-tab-active');
-      if (chatContent) chatContent.classList.add('agent-tab-content-active');
+    if (!isThis) {
+      // Close info panel when switching away
+      const inner = p.querySelector('.pane-inner');
+      if (inner) inner.classList.remove('info-open');
+      const infoPanel = p.querySelector('.info-panel');
+      if (infoPanel) infoPanel.style.display = 'none';
     }
     if (isThis && agentId === '_global') {
       loadGlobalFiles();

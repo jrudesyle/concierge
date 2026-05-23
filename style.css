@@ -1483,6 +1483,45 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border); }
 
+/* ── Info Panel ── */
+.info-panel {
+  width: 340px;
+  min-width: 340px;
+  background: var(--surface2);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  display: none;
+  flex-direction: column;
+}
+.info-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.btn-info-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+  border-radius: 3px;
+}
+.btn-info-close:hover { color: var(--text); background: var(--surface3); }
+.info-panel-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+.pane-inner.info-open .info-panel { display: flex; }
+.pane-inner.info-open .chat-area { flex: 1; }
+
 /* ── Responsive ── */
 @media (max-width: 800px) {
   .dashboard-header { padding: 0 14px; }

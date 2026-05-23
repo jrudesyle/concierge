@@ -1012,6 +1012,40 @@ async function handle(req, res) {
     return;
   }
 
+  // POST /api/agents/:id/subagents — create custom sub-agent
+  if (method === 'POST' && pathParts.length === 4 && pathParts[0] === 'api' && pathParts[1] === 'agents' && pathParts[3] === 'subagents') {
+    const agentId = pathParts[2];
+    const body = await parseBody(req);
+    if (!body || !body.label) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing "label"' }));
+      return;
+    }
+    if (!state.agents[agentId]) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Agent not found' }));
+      return;
+    }
+
+    const saId = agentId + '-sa-' + Date.now();
+    const sa = {
+      id: saId,
+      label: body.label,
+      description: body.description || body.label,
+      state: 'idle',
+      custom: true,
+      createdAt: new Date().toISOString(),
+    };
+    if (!state.agents[agentId].subAgents) state.agents[agentId].subAgents = [];
+    state.agents[agentId].subAgents.push(sa);
+    state.agents[agentId].updatedAt = new Date().toISOString();
+    saveState();
+    broadcast('agent:update', { agent: agentId });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, subAgent: sa }));
+    return;
+  }
+
   // POST /api/jobs/:id/cancel — cancel running job
   if (method === 'POST' && pathParts.length === 4 && pathParts[0] === 'api' && pathParts[1] === 'jobs' && pathParts[3] === 'cancel') {
     const jobId = pathParts[2];
