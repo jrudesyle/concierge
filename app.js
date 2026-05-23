@@ -326,6 +326,8 @@ function renderSidebar() {
     return;
   }
 
+  renderBottomNav();
+
   // Validate current tab
   if (!currentTab || !state.agents[currentTab]) {
     currentTab = agents[0].id;
@@ -715,6 +717,190 @@ async function loadContextFiles(agentId) {
   }
   renderFileList(container, agentId, data.files, '/api/projects/' + agentId + '/context');
 }
+
+// ── Bottom Nav (mobile) ──
+function renderBottomNav() {
+  const list = document.getElementById('bottomNavList');
+  if (!list) return;
+
+  var items = [
+    { id: '_shell', icon: '⌨️', label: 'Shell' },
+    { id: '_global', icon: '🌐', label: 'Global' },
+  ];
+
+  Object.values(state.agents).forEach(function(a) {
+    var emoji = a.emoji || '📁';
+    items.push({ id: a.id, icon: emoji, label: (a.label || a.id).substring(0, 6) });
+  });
+
+  list.innerHTML = items.map(function(item) {
+    var active = item.id === currentTab ? 'active' : '';
+    return '<button class="bottom-nav-item ' + active + '" data-agent="' + item.id + '">' +
+      '<span class="bni-icon">' + item.icon + '</span>' +
+      '<span class="bni-label">' + item.label + '</span></button>';
+  }).join('');
+
+  list.querySelectorAll('.bottom-nav-item').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      selectAgent(this.dataset.agent);
+    });
+  });
+}
+
+// Update bottom nav active state when switching
+function updateBottomNav() {
+  document.querySelectorAll('.bottom-nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.agent === currentTab);
+  });
+}
+
+// ── Mobile Bottom Sheet ──
+function openBottomSheet(agentId) {
+  const sheet = document.getElementById('bottomSheet');
+  const content = document.getElementById('bottomSheetContent');
+  if (!sheet || !content) return;
+
+  // Copy info panel content into sheet
+  const infoPanel = document.getElementById('infoPanel-' + agentId);
+  if (infoPanel) {
+    content.innerHTML = infoPanel.innerHTML;
+    // Re-bind interactive elements inside the sheet
+    bindSheetElements(agentId);
+  } else {
+    content.innerHTML = '<div class="empty-state" style="padding:20px"><p>Loading...</p></div>';
+  }
+
+  sheet.classList.add('open');
+
+  // Close sheet on backdrop click
+  sheet.addEventListener('click', function(e) {
+    if (e.target === sheet) sheet.classList.remove('open');
+  });
+}
+
+function closeBottomSheet() {
+  document.getElementById('bottomSheet').classList.remove('open');
+}
+
+function bindSheetElements(agentId) {
+  // Bind add-task
+  document.querySelectorAll('#bottomSheetContent .btn-add-task').forEach(function(btn) {
+    btn.addEventListener('click', function() { spawnAddTaskForm(agentId); });
+  });
+  // Bind reload-files
+  document.querySelectorAll('#bottomSheetContent .btn-reload-files').forEach(function(btn) {
+    btn.addEventListener('click', function() { loadContextFiles(agentId); });
+  });
+  // Bind subagent spawn
+  document.querySelectorAll('#bottomSheetContent .subagent-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      spawnSubAgent(agentId, this.dataset.subagent, this);
+    });
+  });
+  // Bind create-agent
+  document.querySelectorAll('#bottomSheetContent .btn-create-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() { showCreateSubAgentForm(agentId); });
+  });
+  // Bind context file expand
+  document.querySelectorAll('#bottomSheetContent .ctx-file-header').forEach(function(el) {
+    el.addEventListener('click', async function() {
+      var parent = this.parentElement;
+      var editor = parent.querySelector('.ctx-file-editor');
+      var file = parent.dataset.file;
+      var base = parent.dataset.base || ('/api/projects/' + agentId + '/context');
+      if (editor.style.display === 'block') {
+        editor.style.display = 'none';
+        return;
+      }
+      var fileData = await apiFetch(base + '/' + file);
+      if (fileData && fileData.content !== undefined) {
+        var textarea = editor.querySelector('.ctx-textarea');
+        if (textarea) textarea.value = fileData.content;
+        editor.style.display = 'block';
+      }
+    });
+  });
+  // Save
+  document.querySelectorAll('#bottomSheetContent .ctx-save-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var file = this.dataset.file;
+      var base = this.dataset.base || ('/api/projects/' + agentId + '/context');
+      var editor = this.closest('.ctx-file-editor');
+      var textarea = editor ? editor.querySelector('.ctx-textarea') : null;
+      if (!textarea) return;
+      var result = await apiFetch(base + '/' + file, {
+        method: 'PUT',
+        body: JSON.stringify({ content: textarea.value }),
+      });
+      if (result && result.ok) {
+        showToast('💾', 'Saved', file, 2000);
+        if (editor) editor.style.display = 'none';
+      } else {
+        showToast('❌', 'Save failed', file, 3000);
+      }
+    });
+  });
+  // Cancel
+  document.querySelectorAll('#bottomSheetContent .ctx-cancel-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var editor = this.closest('.ctx-file-editor');
+      if (editor) editor.style.display = 'none';
+    });
+  });
+  // Load context files for this agent
+  loadContextFiles(agentId);
+}
+
+// ── Swipe Gesture Detection ──
+var touchStartX = 0;
+var touchStartY = 0;
+var touchStartTime = 0;
+var isSwiping = false;
+
+document.addEventListener('touchstart', function(e) {
+  // Only track single-finger horizontal swipes in chat area
+  var target = e.target;
+  if (!target.closest('.tab-pane.active')) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+  isSwiping = false;
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+  if (!touchStartX) return;
+  var dx = e.touches[0].clientX - touchStartX;
+  var dy = e.touches[0].clientY - touchStartY;
+
+  // Only horizontal swipes, more than 30px
+  if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    isSwiping = true;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', function(e) {
+  if (!touchStartX || !isSwiping) {
+    touchStartX = 0;
+    return;
+  }
+  var dx = e.changedTouches[0].clientX - touchStartX;
+  var dt = Date.now() - touchStartTime;
+
+  if (Math.abs(dx) > 50 && dt < 500) {
+    // Get list of agents in order
+    var agents = ['_shell', '_global'].concat(Object.keys(state.agents));
+    var idx = agents.indexOf(currentTab);
+    if (dx < 0 && idx < agents.length - 1) {
+      // Swipe left → next
+      selectAgent(agents[idx + 1]);
+    } else if (dx > 0 && idx > 0) {
+      // Swipe right → previous
+      selectAgent(agents[idx - 1]);
+    }
+  }
+  touchStartX = 0;
+  isSwiping = false;
+}, { passive: true });
 
 function renderSubtask(s) {
   const stateLabels = { done: '✅ Done', running: '🔄 Running', error: '❌ Failed', pending: '⏳ Pending' };
