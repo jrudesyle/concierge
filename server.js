@@ -694,6 +694,131 @@ async function handle(req, res) {
     return;
   }
 
+  // ── File-backed Real Tasks ──
+  function parseTasksFile(filePath) {
+    try {
+      if (!fs.existsSync(filePath)) return { sections: [], raw: '' };
+      var raw = fs.readFileSync(filePath, 'utf8');
+      var lines = raw.split('\n');
+      var sections = [];
+      var currentSection = { name: 'Tasks', tasks: [] };
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var sectionMatch = line.match(/^##\s+(.+)/);
+        if (sectionMatch) {
+          if (currentSection.tasks.length > 0) sections.push(currentSection);
+          currentSection = { name: sectionMatch[1].trim(), tasks: [] };
+        }
+        var taskMatch = line.match(/^[-*] \[([ xX])\] (.+)/);
+        if (taskMatch) {
+          currentSection.tasks.push({
+            checked: taskMatch[1] === 'x' || taskMatch[1] === 'X',
+            text: taskMatch[2].trim(),
+            lineNum: i,
+          });
+        }
+      }
+      if (currentSection.tasks.length > 0) sections.push(currentSection);
+      return { sections, raw };
+    } catch (_) { return { sections: [], raw: '' }; }
+  }
+
+  function rebuildTasksFile(sections) {
+    var result = '# Tasks\n\n';
+    for (var i = 0; i < sections.length; i++) {
+      result += '## ' + sections[i].name + '\n';
+      if (sections[i].tasks.length === 0) {
+        result += '- (none)\n';
+      } else {
+        for (var j = 0; j < sections[i].tasks.length; j++) {
+          var t = sections[i].tasks[j];
+          result += '- [' + (t.checked ? 'x' : ' ') + '] ' + t.text + '\n';
+        }
+      }
+      result += '\n';
+    }
+    return result;
+  }
+
+  // GET /api/projects/:id/tasks — list real tasks
+  if (method === 'GET' && pathParts.length === 4 && pathParts[0] === 'api' && pathParts[1] === 'projects' && pathParts[3] === 'tasks') {
+    var projectId = pathParts[2];
+    var tasksFile = path.join(PROJECTS_DIR, projectId, 'context', 'tasks.md');
+    var data = parseTasksFile(tasksFile);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // POST /api/projects/:id/tasks/toggle — toggle a task
+  if (method === 'POST' && pathParts.length === 5 && pathParts[0] === 'api' && pathParts[1] === 'projects' && pathParts[3] === 'tasks' && pathParts[4] === 'toggle') {
+    var projectId = pathParts[2];
+    var body = await parseBody(req);
+    if (!body || body.text === undefined) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Missing text' }));
+      return;
+    }
+    var tasksFile = path.join(PROJECTS_DIR, projectId, 'context', 'tasks.md');
+    var data = parseTasksFile(tasksFile);
+    var found = false;
+    for (var si = 0; si < data.sections.length; si++) {
+      for (var ti = 0; ti < data.sections[si].tasks.length; ti++) {
+        if (data.sections[si].tasks[ti].text === body.text) {
+          data.sections[si].tasks[ti].checked = body.checked !== undefined ? !!body.checked : !data.sections[si].tasks[ti].checked;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (found) {
+      try {
+        var newContent = rebuildTasksFile(data.sections);
+        fs.writeFileSync(tasksFile, newContent, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    } else {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'Task not found' }));
+    }
+    return;
+  }
+
+  // POST /api/projects/:id/tasks/add — add a task
+  if (method === 'POST' && pathParts.length === 5 && pathParts[0] === 'api' && pathParts[1] === 'projects' && pathParts[3] === 'tasks' && pathParts[4] === 'add') {
+    var projectId = pathParts[2];
+    var body = await parseBody(req);
+    if (!body || !body.text) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Missing text' }));
+      return;
+    }
+    var tasksFile = path.join(PROJECTS_DIR, projectId, 'context', 'tasks.md');
+    var data = parseTasksFile(tasksFile);
+    // Add to first pending/in-progress section, or create one
+    var section = data.sections.find(function(s) { return /pending|in.progress/i.test(s.name); });
+    if (!section) {
+      section = { name: 'Pending', tasks: [] };
+      data.sections.unshift(section);
+    }
+    section.tasks.push({ checked: false, text: body.text });
+    try {
+      var newContent = rebuildTasksFile(data.sections);
+      fs.writeFileSync(tasksFile, newContent, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // GET /api/projects/:id/context — list context files
   if (method === 'GET' && pathParts.length === 4 && pathParts[0] === 'api' && pathParts[1] === 'projects' && pathParts[3] === 'context') {
     const projectId = pathParts[2];

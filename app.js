@@ -783,13 +783,49 @@ function closeBottomSheet() {
 }
 
 function bindSheetElements(agentId) {
-  // Bind add-task
+  // Bind add-task (inline)
   document.querySelectorAll('#bottomSheetContent .btn-add-task').forEach(function(btn) {
-    btn.addEventListener('click', function() { spawnAddTaskForm(agentId); });
+    btn.addEventListener('click', function() {
+      var list = document.getElementById('bottomSheetContent .task-list');
+      // trigger the same logic by looking for the original btn
+      // Actually, just delegate — same as above
+      var agentId = this.dataset.agent;
+      var list = document.getElementById('taskList-' + agentId);
+      if (!list) return;
+      var existing = list.querySelector('.task-add-form');
+      if (existing) { existing.remove(); return; }
+      var form = document.createElement('div');
+      form.className = 'task-add-form';
+      form.innerHTML = '<input type="text" class="task-add-input" placeholder="New task..." />' +
+        '<button class="task-add-confirm">Add</button>' +
+        '<button class="task-cancel-btn">✕</button>';
+      list.appendChild(form);
+      var input = form.querySelector('.task-add-input');
+      input.focus();
+      function addTask() {
+        var text = input.value.trim();
+        if (!text) return;
+        apiFetch('/api/projects/' + agentId + '/tasks/add', {
+          method: 'POST',
+          body: JSON.stringify({ text: text }),
+        }).then(function(result) {
+          if (result && result.ok) { form.remove(); renderTasks(agentId); }
+        });
+      }
+      form.querySelector('.task-add-confirm').addEventListener('click', addTask);
+      form.querySelector('.task-cancel-btn').addEventListener('click', function() { form.remove(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addTask();
+        if (e.key === 'Escape') form.remove();
+      });
+    });
   });
   // Bind reload-files
   document.querySelectorAll('#bottomSheetContent .btn-reload-files').forEach(function(btn) {
-    btn.addEventListener('click', function() { loadContextFiles(agentId); });
+    btn.addEventListener('click', function() {
+      loadContextFiles(agentId);
+      renderTasks(agentId);
+    });
   });
   // Bind subagent spawn
   document.querySelectorAll('#bottomSheetContent .subagent-btn').forEach(function(btn) {
@@ -847,8 +883,9 @@ function bindSheetElements(agentId) {
       if (editor) editor.style.display = 'none';
     });
   });
-  // Load context files for this agent
+  // Load context files and tasks for this agent
   loadContextFiles(agentId);
+  renderTasks(agentId);
 }
 
 // ── Swipe Gesture Detection ──
@@ -902,21 +939,41 @@ document.addEventListener('touchend', function(e) {
   isSwiping = false;
 }, { passive: true });
 
-function renderSubtask(s) {
-  const stateLabels = { done: '✅ Done', running: '🔄 Running', error: '❌ Failed', pending: '⏳ Pending' };
-  const timeStr = s.timestamp ? new Date(s.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-  return `
-    <div class="subtask-item state-${s.state}">
-      <span class="icon">${s.icon || '📋'}</span>
-      <div class="content">
-        <div class="label">${s.label}</div>
-        <div class="meta">
-          <span>${stateLabels[s.state] || '⏳ Pending'}</span>
-          ${timeStr ? `<span>${timeStr}</span>` : ''}
-        </div>
-      </div>
-    </div>
-  `;
+function renderTasks(agentId) {
+  const container = document.getElementById('taskList-' + agentId);
+  if (!container) return;
+  apiFetch('/api/projects/' + agentId + '/tasks').then(function(data) {
+    if (!data || !data.sections || data.sections.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:10px"><p>No tasks yet.<br><small>Add one below.</small></p></div>';
+      return;
+    }
+    container.innerHTML = data.sections.map(function(section) {
+      var tasks = section.tasks.map(function(t) {
+        return '<label class="task-item">' +
+          '<input type="checkbox" class="task-checkbox" data-agent="' + agentId + '" data-text="' + escapeHtml(t.text) + '"' + (t.checked ? ' checked' : '') + ' />' +
+          '<span class="task-text' + (t.checked ? ' done' : '') + '">' + escapeHtml(t.text) + '</span>' +
+          '</label>';
+      }).join('');
+      return '<div class="task-section"><div class="task-section-title">' + escapeHtml(section.name) + '</div>' + tasks + '</div>';
+    }).join('');
+
+    // Bind checkbox toggles
+    container.querySelectorAll('.task-checkbox').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var text = this.dataset.text;
+        var agent = this.dataset.agent;
+        apiFetch('/api/projects/' + agent + '/tasks/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ text: text, checked: this.checked }),
+        }).then(function(result) {
+          if (result && result.ok) {
+            // Re-render
+            renderTasks(agent);
+          }
+        });
+      });
+    });
+  });
 }
 
 // ── Agent Chat ──
