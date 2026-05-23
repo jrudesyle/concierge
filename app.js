@@ -528,19 +528,18 @@ function renderFileList(container, agentId, files, basePath) {
 }
 
 // ── Render Panes ──
+// ── Render Panes ──
 function renderPanes() {
-  // Remove old agent panes (keep shell pane)
   document.querySelectorAll('.tab-pane:not(#pane-_shell)').forEach(p => p.remove());
 
-  // Ensure shell and global panes exist
   createShellPane();
   createGlobalPane();
 
   const agents = Object.values(state.agents);
   agents.forEach(a => {
     const pane = document.createElement('div');
-    pane.className = `tab-pane ${a.id === currentTab ? 'active' : ''}`;
-    pane.id = `pane-${a.id}`;
+    pane.className = 'tab-pane ' + (a.id === currentTab ? 'active' : '');
+    pane.id = 'pane-' + a.id;
 
     let statusClass = 'status-healthy';
     if (a.status === 'warning') statusClass = 'status-warning';
@@ -548,142 +547,180 @@ function renderPanes() {
     else if (a.status === 'idle') statusClass = 'status-idle';
     else if (a.status === 'active') statusClass = 'status-active';
 
-    // Build subtask HTML
-    const subtaskHTML = a.subtasks.length === 0
-      ? '<div class="empty-state" style="padding:16px"><p>No tasks yet.</p></div>'
-      : a.subtasks.map(s => renderSubtask(s)).join('');
+    const labelClean = (a.label || a.id).replace(/['"]/g, '');
 
     // Build sub-agent buttons
-    const subAgentHTML = a.subAgents.length === 0
+    const saHTML = a.subAgents.length === 0
       ? '<p class="empty-state" style="padding:12px;font-size:0.82rem">No sub-agents configured.</p>'
-      : a.subAgents.map(sa => `
-          <button class="subagent-btn" data-agent="${a.id}" data-subagent="${sa.id}">
-            <span class="sa-icon">⚡</span>
-            <span class="sa-label">${sa.label}</span>
-            <span class="sa-desc">${sa.description}</span>
-          </button>
-        `).join('');
+      : a.subAgents.map(function(sa) {
+          return '<button class="subagent-btn" data-agent="' + a.id + '" data-subagent="' + sa.id + '">' +
+            '<span class="sa-icon">⚡</span>' +
+            '<span class="sa-label">' + sa.label + '</span>' +
+            '<span class="sa-desc">' + sa.description + '</span></button>';
+        }).join('');
 
-    const labelClean = (a.label || a.id).replace(/['"]/g, '');
-    pane.innerHTML = `
-      <div class="pane-header">
-        <h2>${a.emoji || ''} ${a.label || a.id}</h2>
-        <div class="pane-header-actions">
-          <span class="pane-status-tag ${statusClass}">${a.statusLabel}</span>
-          <button class="btn-icon btn-del-agent" data-agent="${a.id}" title="Delete agent">🗑️</button>
-        </div>
-      </div>
-      <div class="agent-tabs">
-        <button class="agent-tab agent-tab-active" data-pane="${a.id}" data-tab="chat">💬 Chat</button>
-        <button class="agent-tab" data-pane="${a.id}" data-tab="info">📋 Info</button>
-      </div>
-      <div class="agent-tab-content agent-tab-content-active" id="tabChat-${a.id}">
-        <div class="chat-header-bar">
-          <span class="chat-header-title">💬 ${labelClean}</span>
-          <button class="chat-fs-btn" data-agent="${a.id}" title="Full screen">⛶</button>
-        </div>
-        <div class="chat-box">
-          <div class="chat-messages" id="chatMsgs-${a.id}">
-            <div class="chat-empty">
-              <div class="big-icon">💬</div>
-              <p>Start a conversation — ask questions, review code, or get help.</p>
-            </div>
-          </div>
-          <div class="chat-input-bar">
-            <input type="text" class="chat-input" id="chatInput-${a.id}" data-agent="${a.id}" placeholder="Ask about ${labelClean}..." />
-            <button class="chat-send-btn" data-agent="${a.id}">Send</button>
-          </div>
-        </div>
-      </div>
-      <div class="agent-tab-content" id="tabInfo-${a.id}">
-        ${a.context ? `<div class="context-panel"><strong>${a.description || ''}</strong> ${a.context}</div>` : ''}
-        ${a.topic ? `<div class="context-panel topic-ref">📁 Topic: <code>${a.topic}</code></div>` : ''}
-        <div class="section-header">
-          <h3>📋 Tasks</h3>
-          <button class="btn-icon btn-add-task" data-agent="${a.id}" title="Add task">＋</button>
-        </div>
-        <div class="subtask-feed" id="feed-${a.id}">${subtaskHTML}</div>
-        <div class="section-header">
-          <h3>⚡ Sub-Agents</h3>
-        </div>
-        <div class="subagent-grid" id="subagents-${a.id}">${subAgentHTML}</div>
-        <div class="section-header">
-          <h3>📄 Context Files</h3>
-          <button class="btn-icon btn-reload-files" data-agent="${a.id}" title="Reload files">🔄</button>
-        </div>
-        <div class="context-files" id="ctxFiles-${a.id}">
-          <div class="empty-state"><p>Loading...</p></div>
-        </div>
-      </div>
-    `;
+    pane.innerHTML =
+      '<div class="pane-inner">' +
+        // Main Chat Area
+        '<div class="chat-area">' +
+          '<div class="chat-header-bar">' +
+            '<span class="chat-header-title">' + (a.emoji || '') + ' ' + labelClean + '</span>' +
+            '<div class="chat-header-actions">' +
+              '<span class="pane-status-tag ' + statusClass + '">' + (a.statusLabel || '') + '</span>' +
+              '<button class="btn-info-toggle" data-agent="' + a.id + '" title="Toggle project info">📋</button>' +
+              '<button class="chat-fs-btn" data-agent="' + a.id + '" title="Full screen">⛶</button>' +
+              '<button class="btn-icon btn-del-agent" data-agent="' + a.id + '" title="Delete">🗑️</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="chat-box">' +
+            '<div class="chat-messages" id="chatMsgs-' + a.id + '">' +
+              '<div class="chat-empty">' +
+                '<div class="big-icon">💬</div>' +
+                '<p>Start a conversation — ask questions, review code, or get help.</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="chat-input-bar">' +
+              '<input type="text" class="chat-input" id="chatInput-' + a.id + '" data-agent="' + a.id + '" placeholder="Ask about ' + labelClean + '..." />' +
+              '<button class="chat-send-btn" data-agent="' + a.id + '">Send</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        // Info Panel (slide-out from right)
+        '<div class="info-panel" id="infoPanel-' + a.id + '" style="display:none">' +
+          '<div class="info-panel-header">' +
+            '<span>📋 Project Info</span>' +
+            '<button class="btn-info-close" data-agent="' + a.id + '">✕</button>' +
+          '</div>' +
+          '<div class="info-panel-body">' +
+            (a.context ? '<div class="context-panel"><strong>' + (a.description || '') + '</strong> ' + a.context + '</div>' : '') +
+            (a.topic ? '<div class="context-panel topic-ref">📁 Topic: <code>' + a.topic + '</code></div>' : '') +
+            '<div class="section-header">' +
+              '<h3>📋 Tasks</h3>' +
+              '<button class="btn-icon btn-add-task" data-agent="' + a.id + '" title="Add task">＋</button>' +
+            '</div>' +
+            '<div class="task-list" id="taskList-' + a.id + '">' +
+              '<div class="empty-state" style="padding:10px"><p>Loading...</p></div>' +
+            '</div>' +
+            '<div class="section-header">' +
+              '<h3>⚡ Sub-Agents</h3>' +
+              '<button class="btn-icon btn-create-agent" data-agent="' + a.id + '" title="Create custom sub-agent">＋</button>' +
+            '</div>' +
+            '<div class="subagent-grid" id="subagents-' + a.id + '">' + saHTML + '</div>' +
+            '<div class="section-header">' +
+              '<h3>📄 Context Files</h3>' +
+              '<button class="btn-icon btn-reload-files" data-agent="' + a.id + '" title="Reload files">🔄</button>' +
+            '</div>' +
+            '<div class="context-files" id="ctxFiles-' + a.id + '">' +
+              '<div class="empty-state"><p>Loading...</p></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
     main.appendChild(pane);
   });
 
-  // Bind agent sub-tabs
-  document.querySelectorAll('.agent-tab').forEach(btn => {
+  // Bind info toggle buttons
+  document.querySelectorAll('.btn-info-toggle').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      const paneId = this.dataset.pane;
-      const tab = this.dataset.tab;
-      const container = document.getElementById('pane-' + paneId);
-      if (!container) return;
-      container.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('agent-tab-active'));
-      this.classList.add('agent-tab-active');
-      container.querySelectorAll('.agent-tab-content').forEach(tc => tc.classList.remove('agent-tab-content-active'));
-      const target = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1) + '-' + paneId);
-      if (target) target.classList.add('agent-tab-content-active');
-      // Exit fullscreen when switching to Info tab
-      if (tab === 'info') {
-        document.body.classList.remove('chat-fullscreen');
-        document.querySelectorAll('.chat-fs-btn').forEach(function(b) {
-          b.textContent = '⛶';
-          b.title = 'Full screen';
-        });
-      }
+      toggleInfoPanel(this.dataset.agent);
+    });
+  });
+  document.querySelectorAll('.btn-info-close').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      closeInfoPanel(this.dataset.agent);
     });
   });
 
-  // Bind chat fullscreen toggles
+  // Bind chat fullscreen
   document.querySelectorAll('.chat-fs-btn').forEach(function(btn) {
     btn.addEventListener('click', toggleChatFullscreen);
   });
 
-  // Bind chat send buttons
-  document.querySelectorAll('.chat-send-btn').forEach(btn => {
+  // Bind chat send
+  document.querySelectorAll('.chat-send-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       handleChatSend(this.dataset.agent);
     });
   });
-  document.querySelectorAll('.chat-input').forEach(inp => {
-    inp.addEventListener('keydown', function(e) {
+
+  // Bind chat input enter
+  document.querySelectorAll('.chat-input').forEach(function(input) {
+    input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') handleChatSend(this.dataset.agent);
     });
   });
 
-  // Bind delete buttons
-  document.querySelectorAll('.btn-del-agent').forEach(btn => {
-    btn.addEventListener('click', () => deleteAgent(btn.dataset.agent));
+  // Bind delete
+  document.querySelectorAll('.btn-del-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteAgent(this.dataset.agent); });
   });
 
-  // Bind add task buttons
-  document.querySelectorAll('.btn-add-task').forEach(btn => {
-    btn.addEventListener('click', () => showAddTaskModal(btn.dataset.agent));
-  });
-
-  // Bind sub-agent buttons
-  document.querySelectorAll('.subagent-btn').forEach(btn => {
-    btn.addEventListener('click', () => spawnSubAgent(btn.dataset.agent, btn.dataset.subagent, btn));
-  });
-
-  // Bind reload context files
-  document.querySelectorAll('.btn-reload-files').forEach(btn => {
+  // Bind add-task (inline form)
+  document.querySelectorAll('.btn-add-task').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      loadContextFiles(this.dataset.agent);
+      var agentId = this.dataset.agent;
+      var list = document.getElementById('taskList-' + agentId);
+      if (!list) return;
+      var existing = list.querySelector('.task-add-form');
+      if (existing) { existing.remove(); return; }
+      var form = document.createElement('div');
+      form.className = 'task-add-form';
+      form.innerHTML = '<input type="text" class="task-add-input" placeholder="New task..." />' +
+        '<button class="task-add-confirm">Add</button>' +
+        '<button class="task-cancel-btn">✕</button>';
+      list.appendChild(form);
+      var input = form.querySelector('.task-add-input');
+      input.focus();
+      function addTask() {
+        var text = input.value.trim();
+        if (!text) return;
+        apiFetch('/api/projects/' + agentId + '/tasks/add', {
+          method: 'POST',
+          body: JSON.stringify({ text: text }),
+        }).then(function(result) {
+          if (result && result.ok) { form.remove(); renderTasks(agentId); }
+        });
+      }
+      form.querySelector('.task-add-confirm').addEventListener('click', addTask);
+      form.querySelector('.task-cancel-btn').addEventListener('click', function() { form.remove(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addTask();
+        if (e.key === 'Escape') form.remove();
+      });
     });
   });
 
-  // Load context files for active pane and all on render
-  loadContextFiles(currentTab);
+  // Bind reload-files
+  document.querySelectorAll('.btn-reload-files').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var agentId = this.dataset.agent;
+      loadContextFiles(agentId);
+      renderTasks(agentId);
+    });
+  });
+
+  // Bind subagent spawn
+  document.querySelectorAll('.subagent-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      spawnSubAgent(this.dataset.agent, this.dataset.subagent, this);
+    });
+  });
+
+  // Bind create custom agent
+  document.querySelectorAll('.btn-create-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showCreateSubAgentForm(this.dataset.agent);
+    });
+  });
+
+  // Load context files + tasks for visible agent
+  if (currentTab && currentTab !== '_shell' && currentTab !== '_global') {
+    loadContextFiles(currentTab);
+    renderTasks(currentTab);
+  }
+  var visibleInput = document.getElementById('chatInput-' + currentTab);
+  if (visibleInput) visibleInput.focus();
 }
 
 function toggleChatFullscreen() {
