@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concierge — Agent Dashboard</title>
+  <link rel="stylesheet" href="style.css?v=1779557409" />
+</head>
+<body data-theme="clean">
+  <div class="app-layout">
+    <!-- ── Header ── -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">☰</button>
+        <h1>🔧 Concierge</h1>
+        <span class="header-subtitle">Agent Command Center</span>
+      </div>
+      <div class="header-right">
+        <div class="theme-selector">
+          <select id="themeSelect">
+            <option value="cyber">Cyber</option>
+            <option value="nord">Nord</option>
+            <option value="dracula">Dracula</option>
+            <option value="forest">Forest</option>
+            <option value="matrix">Matrix</option>
+            <option value="retro">Retro</option>
+            <option value="solarized">Solarized</option>
+            <option value="clean" selected>Clean Light</option>
+            <option value="sunset">Sunset</option>
+            <option value="mono">Monochrome</option>
+          </select>
+        </div>
+        <div class="connection-status" id="connectionStatus">
+          <span class="dot dot-green"></span>
+          <span>Connected</span>
+        </div>
+        <button class="btn-icon" id="notifTestBtn" title="Test Notification">🔔</button>
+        <span class="clock" id="clock"></span>
+      </div>
+    </header>
+
+    <!-- ── Body Layout ── -->
+    <div class="body-layout">
+      <!-- ── Sidebar ── -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <span>Projects</span>
+          <span class="project-count" id="agentCount">0</span>
+        </div>
+        <div class="sidebar-list" id="sidebarList">
+          <!-- Sidebar items injected by JS -->
+        </div>
+        <div class="sidebar-footer">
+          <button class="sidebar-add-btn" id="addAgentBtn">＋ New Project</button>
+        </div>
+      </aside>
+
+      <!-- ── Main Content ── -->
+      <main class="dashboard-main" id="dashboardMain">
+        <!-- Tab panes injected by JS -->
+
+        <!-- Global agent input bar -->
+        <div class="agent-input-bar">
+          <div class="input-row">
+            <input type="text" id="agentNameInput" placeholder="Project name" class="input-agent" />
+            <input type="text" id="agentMsgInput" placeholder='Status update... (append [done] [error] [running] [pending])' class="input-msg" />
+            <button id="sendUpdateBtn" class="btn-primary">Send Update</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js?v=1779557409"></script>
+</body>
+</html>
