@@ -302,11 +302,17 @@ function renderSidebar() {
   // Shell sidebar item
   const shellActive = currentTab === '_shell' ? 'active' : '';
   const shellDot = runningShellCmdId ? 'si-status-warning' : 'si-status-idle';
+  const globalActive = currentTab === '_global' ? 'active' : '';
   sidebarList.innerHTML = `
     <button class="sidebar-item ${shellActive}" data-agent="_shell">
       <span class="si-status ${shellDot}" id="shellStatusDot"></span>
       <span class="si-icon">⌨️</span>
       <span class="si-label">Shell</span>
+    </button>
+    <button class="sidebar-item ${globalActive}" data-agent="_global">
+      <span class="si-status si-status-healthy"></span>
+      <span class="si-icon">🌐</span>
+      <span class="si-label">Global</span>
     </button>
   ` + agents.map(a => {
     const active = a.id === currentTab ? 'active' : '';
@@ -350,18 +356,20 @@ function selectAgent(agentId) {
     el.classList.toggle('active', el.dataset.agent === agentId);
   });
 
-  // Update pane visibility and reset to Chat tab
+  // Update pane visibility and reset to Chat tab (for projects)
   document.querySelectorAll('.tab-pane').forEach(p => {
     const isThis = p.id === `pane-${agentId}`;
     p.classList.toggle('active', isThis);
-    if (isThis && agentId !== '_shell') {
-      // Reset to Chat tab
+    if (isThis && agentId !== '_shell' && agentId !== '_global') {
       p.querySelectorAll('.agent-tab').forEach(t => t.classList.remove('agent-tab-active'));
       p.querySelectorAll('.agent-tab-content').forEach(tc => tc.classList.remove('agent-tab-content-active'));
       const chatBtn = p.querySelector('.agent-tab[data-tab="chat"]');
       const chatContent = p.querySelector('#tabChat-' + agentId);
       if (chatBtn) chatBtn.classList.add('agent-tab-active');
       if (chatContent) chatContent.classList.add('agent-tab-content-active');
+    }
+    if (isThis && agentId === '_global') {
+      loadGlobalFiles();
     }
   });
 
@@ -380,13 +388,120 @@ function selectAgent(agentId) {
   }
 }
 
+// ── Global Pane ──
+function createGlobalPane() {
+  if (document.getElementById('pane-_global')) return;
+  const pane = document.createElement('div');
+  pane.className = 'tab-pane';
+  pane.id = 'pane-_global';
+  pane.innerHTML = `
+    <div class="pane-header">
+      <h2>🌐 Global Context</h2>
+      <div class="pane-header-actions">
+        <span class="pane-status-tag status-healthy">Applied to All Projects</span>
+      </div>
+    </div>
+    <div class="context-panel"><strong>Global settings, identity, and tools.</strong> Loaded into every project chat. Edit below.</div>
+    <div class="section-header">
+      <h3>📄 Global Files</h3>
+      <button class="btn-icon btn-reload-global" title="Reload">🔄</button>
+    </div>
+    <div class="context-files" id="globalFiles">
+      <div class="empty-state"><p>Loading...</p></div>
+    </div>
+  `;
+  main.insertBefore(pane, main.querySelector('.agent-input-bar'));
+
+  pane.querySelector('.btn-reload-global').addEventListener('click', loadGlobalFiles);
+}
+
+async function loadGlobalFiles() {
+  const container = document.getElementById('globalFiles');
+  if (!container) return;
+  const data = await apiFetch('/api/global-context');
+  if (!data || !data.files || data.files.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No global context files yet</p></div>';
+    return;
+  }
+  renderFileList(container, '_global', data.files, '/api/global-context');
+}
+
+function renderFileList(container, agentId, files, basePath) {
+  container.innerHTML = files.map(function(f) {
+    var fname = f.name.replace(/-/g, ' ').replace(/\.md$/, '');
+    return '<div class="ctx-file" data-agent="' + agentId + '" data-file="' + f.name + '" data-base="' + basePath + '">' +
+      '<div class="ctx-file-header">' +
+      '<span class="ctx-file-icon">📄</span>' +
+      '<span class="ctx-file-name">' + fname + '</span>' +
+      '<span class="ctx-file-size">' + (f.size > 1024 ? Math.round(f.size / 1024) + ' KB' : f.size + ' B') + '</span>' +
+      '</div>' +
+      '<div class="ctx-file-editor" style="display:none">' +
+      '<textarea class="ctx-textarea" data-agent="' + agentId + '" data-file="' + f.name + '" data-base="' + basePath + '"></textarea>' +
+      '<div class="ctx-editor-actions">' +
+      '<button class="ctx-save-btn" data-agent="' + agentId + '" data-file="' + f.name + '" data-base="' + basePath + '">💾 Save</button>' +
+      '<button class="ctx-cancel-btn">Cancel</button>' +
+      '</div></div></div>';
+  }).join('');
+
+  // Bind click to expand
+  container.querySelectorAll('.ctx-file-header').forEach(function(el) {
+    el.addEventListener('click', async function() {
+      var parent = this.parentElement;
+      var editor = parent.querySelector('.ctx-file-editor');
+      var file = parent.dataset.file;
+      var agent = parent.dataset.agent;
+      var base = parent.dataset.base;
+      if (editor.style.display === 'block') {
+        editor.style.display = 'none';
+        return;
+      }
+      var fileData = await apiFetch(base + '/' + file);
+      if (fileData && fileData.content !== undefined) {
+        var textarea = editor.querySelector('.ctx-textarea');
+        if (textarea) textarea.value = fileData.content;
+        editor.style.display = 'block';
+      }
+    });
+  });
+
+  container.querySelectorAll('.ctx-save-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var agent = this.dataset.agent;
+      var file = this.dataset.file;
+      var base = this.dataset.base;
+      var editor = this.closest('.ctx-file-editor');
+      if (!editor) return;
+      var textarea = editor.querySelector('.ctx-textarea');
+      if (!textarea) return;
+      var result = await apiFetch(base + '/' + file, {
+        method: 'PUT',
+        body: JSON.stringify({ content: textarea.value }),
+      });
+      if (result && result.ok) {
+        showToast('💾', 'Saved', file, 2000);
+        editor.style.display = 'none';
+      } else {
+        showToast('❌', 'Save failed', file, 3000);
+      }
+    });
+  });
+
+  container.querySelectorAll('.ctx-cancel-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var editor = this.closest('.ctx-file-editor');
+      if (editor) editor.style.display = 'none';
+    });
+  });
+}
+
 // ── Render Panes ──
 function renderPanes() {
   // Remove old agent panes (keep shell pane)
   document.querySelectorAll('.tab-pane:not(#pane-_shell)').forEach(p => p.remove());
 
-  // Ensure shell pane exists
+  // Ensure shell and global panes exist
   createShellPane();
+  createGlobalPane();
 
   const agents = Object.values(state.agents);
   agents.forEach(a => {
@@ -566,72 +681,7 @@ async function loadContextFiles(agentId) {
     container.innerHTML = '<div class="empty-state"><p>No context files yet</p></div>';
     return;
   }
-  container.innerHTML = data.files.map(function(f) {
-    var fname = f.name.replace(/-/g, ' ').replace(/\.md$/, '');
-    return '<div class="ctx-file" data-agent="' + agentId + '" data-file="' + f.name + '">' +
-      '<div class="ctx-file-header">' +
-      '<span class="ctx-file-icon">📄</span>' +
-      '<span class="ctx-file-name">' + fname + '</span>' +
-      '<span class="ctx-file-size">' + (f.size > 1024 ? Math.round(f.size / 1024) + ' KB' : f.size + ' B') + '</span>' +
-      '</div>' +
-      '<div class="ctx-file-editor" id="ctxEditor-' + agentId + '-' + f.name + '" style="display:none">' +
-      '<textarea class="ctx-textarea" data-agent="' + agentId + '" data-file="' + f.name + '"></textarea>' +
-      '<div class="ctx-editor-actions">' +
-      '<button class="ctx-save-btn" data-agent="' + agentId + '" data-file="' + f.name + '">💾 Save</button>' +
-      '<button class="ctx-cancel-btn">Cancel</button>' +
-      '</div></div></div>';
-  }).join('');
-
-  // Bind click to expand
-  container.querySelectorAll('.ctx-file-header').forEach(function(el) {
-    el.addEventListener('click', async function() {
-      var parent = this.parentElement;
-      var editor = parent.querySelector('.ctx-file-editor');
-      var file = parent.dataset.file;
-      var agent = parent.dataset.agent;
-      if (editor.style.display === 'block') {
-        editor.style.display = 'none';
-        return;
-      }
-      // Load file content
-      var fileData = await apiFetch('/api/projects/' + agent + '/context/' + file);
-      if (fileData && fileData.content !== undefined) {
-        var textarea = editor.querySelector('.ctx-textarea');
-        if (textarea) textarea.value = fileData.content;
-        editor.style.display = 'block';
-      }
-    });
-  });
-
-  // Bind save buttons
-  container.querySelectorAll('.ctx-save-btn').forEach(function(btn) {
-    btn.addEventListener('click', async function() {
-      var agent = this.dataset.agent;
-      var file = this.dataset.file;
-      var editor = document.getElementById('ctxEditor-' + agent + '-' + file);
-      if (!editor) return;
-      var textarea = editor.querySelector('.ctx-textarea');
-      if (!textarea) return;
-      var result = await apiFetch('/api/projects/' + agent + '/context/' + file, {
-        method: 'PUT',
-        body: JSON.stringify({ content: textarea.value }),
-      });
-      if (result && result.ok) {
-        showToast('💾', 'Saved', file, 2000);
-        editor.style.display = 'none';
-      } else {
-        showToast('❌', 'Save failed', file, 3000);
-      }
-    });
-  });
-
-  // Bind cancel buttons
-  container.querySelectorAll('.ctx-cancel-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var editor = this.closest('.ctx-file-editor');
-      if (editor) editor.style.display = 'none';
-    });
-  });
+  renderFileList(container, agentId, data.files, '/api/projects/' + agentId + '/context');
 }
 
 function renderSubtask(s) {

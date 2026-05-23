@@ -625,6 +625,75 @@ async function handle(req, res) {
     return;
   }
 
+  // GET /api/global-context — list global context files
+  if (method === 'GET' && pathParts.length === 2 && pathParts[0] === 'api' && pathParts[1] === 'global-context') {
+    try {
+      if (!fs.existsSync(GLOBAL_CTX_DIR)) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ files: [] }));
+        return;
+      }
+      const files = fs.readdirSync(GLOBAL_CTX_DIR).filter(f => f.endsWith('.md')).map(f => ({
+        name: f,
+        path: f,
+        size: fs.statSync(path.join(GLOBAL_CTX_DIR, f)).size,
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ files }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // GET /api/global-context/:file — read a global context file
+  if (method === 'GET' && pathParts.length === 3 && pathParts[0] === 'api' && pathParts[1] === 'global-context') {
+    const fileName = pathParts[2];
+    const filePath = path.resolve(path.join(GLOBAL_CTX_DIR, fileName));
+    if (!filePath.startsWith(GLOBAL_CTX_DIR) || !fileName.endsWith('.md')) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Forbidden' }));
+      return;
+    }
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ name: fileName, content }));
+    } catch (e) {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'File not found' }));
+    }
+    return;
+  }
+
+  // PUT /api/global-context/:file — write a global context file
+  if (method === 'PUT' && pathParts.length === 3 && pathParts[0] === 'api' && pathParts[1] === 'global-context') {
+    const fileName = pathParts[2];
+    const filePath = path.resolve(path.join(GLOBAL_CTX_DIR, fileName));
+    if (!filePath.startsWith(GLOBAL_CTX_DIR) || !fileName.endsWith('.md')) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Forbidden' }));
+      return;
+    }
+    const body = await parseBody(req);
+    if (!body || body.content === undefined) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Missing content' }));
+      return;
+    }
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, body.content, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // GET /api/projects/:id/context — list context files
   if (method === 'GET' && pathParts.length === 4 && pathParts[0] === 'api' && pathParts[1] === 'projects' && pathParts[3] === 'context') {
     const projectId = pathParts[2];
