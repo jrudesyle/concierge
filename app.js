@@ -240,8 +240,14 @@ async function enableNotifications() {
 function sendDesktopNotif(title, body, icon = '🔧') {
   if (!notifEnabled) return;
   try {
-    const n = new Notification(`${icon} ${title}`, { body, tag: 'agent-dash' });
-    setTimeout(() => n.close(), 8000);
+    const n = new Notification(title, {
+      body,
+      icon: '/assets/icon-192.png',
+      badge: '/assets/favicon.png',
+      tag: 'concierge',
+      silent: false,
+    });
+    setTimeout(() => n.close(), 10000);
   } catch (_) {}
 }
 
@@ -957,9 +963,8 @@ function connectSSE() {
       );
       if (notifEnabled) {
         sendDesktopNotif(
-          job.status === 'done' ? '✅ Sub-Agent Complete' : '❌ Sub-Agent Failed',
-          job.message || '',
-          job.status === 'done' ? '✅' : '❌'
+          (job.status === 'done' ? '✅ ' : '❌ ') + (job.label || 'Sub-Agent'),
+          job.message || 'No output'
         );
       }
     } catch (_) {}
@@ -992,6 +997,9 @@ function connectSSE() {
         entry.exitCode = exitCode;
         entry.duration = duration;
       }
+      if (notifEnabled && status === 'done') {
+        sendDesktopNotif('⌨️ Shell', 'Command finished (exit ' + exitCode + ')' + (duration ? ' in ' + (duration / 1000).toFixed(1) + 's' : ''));
+      }
     } catch (_) {}
   });
 
@@ -1010,11 +1018,24 @@ function connectSSE() {
         }
       }
       showToast('💬', agentId, response.slice(0, 80) + (response.length > 80 ? '...' : ''), 4000);
+      if (notifEnabled && currentTab !== agentId) {
+        sendDesktopNotif('💬 ' + agentId, response.slice(0, 120) + (response.length > 120 ? '...' : ''));
+      }
     } catch (_) {}
   });
 }
 
-// ── Init ──
+// ── Service Worker (PWA) ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      console.log('SW registered:', reg.scope);
+    }, function(err) {
+      console.log('SW failed:', err);
+    });
+  });
+}
+
 (async function init() {
   loadTheme();
   notifEnabled = await enableNotifications();
@@ -1051,5 +1072,5 @@ function connectSSE() {
   }
 
   showToast('🔧', 'Concierge v2 Loaded', Object.keys(state.agents).length + ' agents · Sidebar + Shell');
-  if (notifEnabled) sendDesktopNotif('🔧 Concierge', 'v2 with shell & themes');
+  if (notifEnabled) sendDesktopNotif('🔧 Concierge', 'v2 with PWA, global context & project workspaces');
 })();

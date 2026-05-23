@@ -456,24 +456,33 @@ function parseBody(req) {
   });
 }
 
-// ── Project context ──
-const PROJECTS_DIR = path.resolve(process.env.HOME || '/home/rudesyle', '.openclaw/workspace/projects');
+// ── Global + Project context ──
+const WORKSPACE_DIR = path.resolve(process.env.HOME || '/home/rudesyle', '.openclaw/workspace');
+const GLOBAL_CTX_DIR = path.join(WORKSPACE_DIR, 'global-context');
+const PROJECTS_DIR = path.join(WORKSPACE_DIR, 'projects');
 
-function readProjectContext(agentId) {
-  const ctxDir = path.join(PROJECTS_DIR, agentId, 'context');
+function readDirMdFiles(dirPath, maxFiles) {
   try {
-    if (!fs.existsSync(ctxDir)) return '';
-    const files = fs.readdirSync(ctxDir).filter(f => f.endsWith('.md'));
+    if (!fs.existsSync(dirPath)) return '';
+    const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
     let content = '';
-    for (const file of files.slice(0, 8)) { // max 8 files
-      const filePath = path.join(ctxDir, file);
+    for (const file of files.slice(0, maxFiles || 8)) {
+      const filePath = path.join(dirPath, file);
       try {
         const text = fs.readFileSync(filePath, 'utf8').trim();
-        content += `\n--- ${file} ---\n${text.slice(0, 4000)}\n`; // max 4k per file
+        content += '\n--- ' + file + ' ---\n' + text.slice(0, 4000) + '\n';
       } catch (_) {}
     }
     return content;
   } catch (_) { return ''; }
+}
+
+function readGlobalContext() {
+  return readDirMdFiles(GLOBAL_CTX_DIR, 10);
+}
+
+function readProjectContext(agentId) {
+  return readDirMdFiles(path.join(PROJECTS_DIR, agentId, 'context'), 8);
 }
 
 // ── Call OpenClaw API ──
@@ -562,9 +571,11 @@ async function handle(req, res) {
     // Build system prompt from agent state + project context files
     const tasks = agent.subtasks.map(t => '  [' + t.state + '] ' + t.label).join('\n');
     const actions = agent.subAgents.map(sa => '  ' + sa.label + ' — ' + sa.description).join('\n');
+    const globalCtx = readGlobalContext();
     const projectCtx = readProjectContext(agentId);
     const systemPrompt = [
       'You are ' + (agent.label || agent.id) + ', an AI assistant focused on ' + (agent.description || 'managing ' + agent.id) + '.',
+      globalCtx ? ('\n=== Global Context ===' + globalCtx) : '',
       '',
       'Status: ' + (agent.statusLabel || agent.status),
       'Context: ' + (agent.context || 'No additional context'),
@@ -577,7 +588,7 @@ async function handle(req, res) {
       actions || '  (none)',
       projectCtx ? ('\n=== Project Documents ===' + projectCtx) : '',
       '',
-      'Answer questions concisely. Help the user understand the current state and suggest what to do next. Use the project documents above to answer questions.',
+      'Answer questions concisely. Help the user understand the current state and suggest what to do next. Use the project documents and global context above to answer questions.',
     ].filter(Boolean).join('\n');
 
     // Get or create chat history for this agent
