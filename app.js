@@ -18,11 +18,10 @@ const sidebarList = $('sidebarList');
 const agentCount = $('agentCount');
 const main = $('dashboardMain');
 const toastContainer = $('toastContainer');
-const connectionDot = document.querySelector('#connectionStatus .dot');
-const connectionText = document.querySelector('#connectionStatus span:last-child');
+const connectionDot = document.querySelector('#settingsConnection .dot');
+const connectionText = document.querySelector('#settingsConnection span:last-child');
 const clockEl = $('clock');
-const notifBtn = $('notifTestBtn');
-const themeSelect = $('themeSelect');
+const notifBtn = $('settingsNotifBtn');
 const sidebarToggle = $('sidebarToggle');
 const addAgentBtn = $('addAgentBtn');
 
@@ -37,16 +36,19 @@ setInterval(updateClock, 1000);
 function loadTheme() {
   const saved = localStorage.getItem('concierge-theme');
   const theme = saved || 'clean';
-  if (document.querySelector(`#themeSelect option[value="${theme}"]`)) {
-    document.body.dataset.theme = theme;
-    themeSelect.value = theme;
-  }
+  document.body.dataset.theme = theme;
+  document.querySelectorAll('.theme-card').forEach(function(c) {
+    c.classList.toggle('active', c.dataset.theme === theme);
+  });
 }
 function saveTheme(name) {
   document.body.dataset.theme = name;
   localStorage.setItem('concierge-theme', name);
+  document.querySelectorAll('.theme-card').forEach(function(c) {
+    c.classList.toggle('active', c.dataset.theme === name);
+  });
 }
-themeSelect.addEventListener('change', () => saveTheme(themeSelect.value));
+
 
 // ── Shell Pane ──
 function createShellPane() {
@@ -1100,10 +1102,28 @@ if ('serviceWorker' in navigator) {
 
   // Manual update events
 
+  // Settings modal
+  document.getElementById('settingsBtn').addEventListener('click', function() {
+    document.getElementById('settingsModal').classList.add('open');
+  });
+  document.getElementById('settingsClose').addEventListener('click', function() {
+    document.getElementById('settingsModal').classList.remove('open');
+  });
+  document.getElementById('settingsModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  // Theme picker
+  document.querySelectorAll('.theme-card').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      saveTheme(this.dataset.theme);
+    });
+  });
+
   // Notif test
-  notifBtn.addEventListener('click', () => {
+  notifBtn.addEventListener('click', function() {
     if (notifEnabled) {
-      sendDesktopNotif('🔔 Test', 'Notifications working!');
+      sendDesktopNotif('🔔 Test', 'Notifications are working!');
       showToast('🔔', 'Test', 'Desktop notification sent!');
     } else {
       showToast('⚠️', 'Notifications', 'Enable in browser permissions.');
