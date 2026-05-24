@@ -547,19 +547,11 @@ function renderFileList(container, agentId, files, basePath) {
   });
 }
 
-// ── Project Strip (mobile chip selector) ──
+// ── Project Strip (mobile) ──
 function renderProjectStrip() {
   if (!projectStrip) return;
-  if (window.innerWidth > 700) { projectStrip.style.display = 'none'; return; }
-  projectStrip.style.display = 'flex';
-  var a = currentTab && state.agents[currentTab] ? state.agents[currentTab] : null;
-  if (!a) { projectStrip.innerHTML = ''; return; }
-  var emoji = a.emoji || '💬';
-  projectStrip.innerHTML =
-    '<span class="strip-current">' + emoji + ' ' + (a.label || a.id) + '</span>' +
-    '<button class="strip-switch-btn" id="switchProjBtn">Switch</button>';
-  var btn = document.getElementById('switchProjBtn');
-  if (btn) btn.addEventListener('click', function() { switchTab('settings'); });
+  // Not needed anymore - header is in the chat pane itself
+  projectStrip.style.display = 'none';
 }
 
 // ── Settings Pane ──
@@ -699,14 +691,16 @@ function renderPanes() {
   // ── Create chat pane ──
   pane.innerHTML =
     '<div class="chat-pane">' +
+      '<div class="chat-header">' +
+        '<span class="chat-header-title">' + labelClean + '</span>' +
+      '</div>' +
       '<div class="chat-messages" id="chatMsgs-' + a.id + '">' +
         '<div class="chat-empty">' +
-          '<div class="big-icon">💬</div>' +
-          '<p>Start a conversation — ask questions, review code, or get help.</p>' +
+          '<p>Ask a question, review code, or get help with <strong>' + labelClean + '</strong>.</p>' +
         '</div>' +
       '</div>' +
       '<div class="chat-input-bar">' +
-        '<input type="text" class="chat-input" id="chatInput-' + a.id + '" data-agent="' + a.id + '" placeholder="Ask about ' + labelClean + '..." />' +
+        '<input type="text" class="chat-input" id="chatInput-' + a.id + '" data-agent="' + a.id + '" placeholder="Message..." />' +
         '<button class="chat-send-btn" data-agent="' + a.id + '">Send</button>' +
       '</div>' +
     '</div>';
@@ -832,19 +826,20 @@ function renderChat(agentId) {
 
   const msgs = agentChats[agentId] || [];
   if (msgs.length === 0) {
-    container.innerHTML = '<div class="chat-empty"><div class="big-icon">💬</div><p>Start a conversation about <strong>' + (escapeHtml(agentId) || 'this project') + '</strong> — ask questions, review status, or get help.</p></div>';
+    container.innerHTML = '<div class="chat-empty"><p>Ask a question, review code, or get help with <strong>' + (escapeHtml(agentId) || 'this project') + '</strong>.</p></div>';
     return;
   }
 
   container.innerHTML = msgs.map(function(m) {
     if (m.role === 'typing') {
-      return '<div class="chat-msg chat-msg-assistant"><div class="chat-typing">Thinking...</div></div>';
+      return '<div class="msg msg-bot"><div class="msg-text"><span class="msg-typing">Thinking...</span></div></div>';
     }
     var time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    var cls = m.role === 'user' ? 'msg-me' : 'msg-bot';
     var content = m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content);
-    return '<div class="chat-msg chat-msg-' + m.role + '">' +
-      '<div class="chat-msg-content">' + content + '</div>' +
-      (time ? '<div class="chat-msg-time">' + time + '</div>' : '') +
+    return '<div class="msg ' + cls + '">' +
+      '<div class="msg-text">' + content + '</div>' +
+      (time ? '<div class="msg-time">' + time + '</div>' : '') +
       '</div>';
   }).join('');
 

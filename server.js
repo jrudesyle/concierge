@@ -14,10 +14,10 @@ const crypto  = require('crypto');
 const PORT         = parseInt(process.env.PORT || process.argv.find(a => a.startsWith('--port='))?.split('=')[1], 10) || 3030;
 
 // ── OpenClaw API Configuration ──
-// Set via env vars or use defaults for Jeff's OC instance
-// Local OpenClaw gateway (port from systemd: --port 18789)
+// Set via OC_API_URL and OC_API_KEY env vars.
+// DO NOT hardcode keys here — they will be exposed in git history.
 const OC_API_URL = process.env.OC_API_URL || 'http://localhost:18789';
-const OC_API_KEY = process.env.OC_API_KEY || 'c260884c97cdad1caf566f58e6814b63017e0fc55dfd2bf6';
+const OC_API_KEY = process.env.OC_API_KEY;
 const OC_MODEL   = process.env.OC_MODEL || 'openclaw';
 const STATIC_DIR   = __dirname;
 const STATE_FILE   = path.join(__dirname, 'state.json');

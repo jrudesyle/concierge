@@ -1,4 +1,4 @@
-const CACHE = 'concierge-v1779590332';
+const CACHE = 'concierge-v1779590596';
 const ASSETS = [
   '/',
   '/index.html',
