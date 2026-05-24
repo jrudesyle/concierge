@@ -1363,6 +1363,15 @@ function connectSSE() {
   });
 }
 
+// ── PWA Install Prompt ──
+var installPromptEvent = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  installPromptEvent = e;
+  var btn = document.getElementById('pwaInstallBtn');
+  if (btn) btn.style.display = 'flex';
+});
+
 // ── Service Worker (PWA) ──
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
@@ -1399,6 +1408,28 @@ if ('serviceWorker' in navigator) {
       saveTheme(this.dataset.theme);
     });
   });
+
+  // PWA Install
+  document.getElementById('pwaInstallBtn').addEventListener('click', function() {
+    if (!installPromptEvent) {
+      showToast('⚠️', 'Install', 'Already installed or not available.');
+      return;
+    }
+    installPromptEvent.prompt();
+    installPromptEvent.userChoice.then(function(result) {
+      if (result.outcome === 'accepted') {
+        document.getElementById('pwaInstallSection').style.display = 'none';
+        showToast('✅', 'Installed!', 'Concierge is now on your home screen.');
+      }
+      installPromptEvent = null;
+    });
+  });
+
+  // Check if already installed
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    var sec = document.getElementById('pwaInstallSection');
+    if (sec) sec.style.display = 'none';
+  }
 
   // Notif test
   notifBtn.addEventListener('click', function() {

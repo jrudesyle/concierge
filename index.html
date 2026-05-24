@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="/assets/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1779580912" />
+  <link rel="stylesheet" href="style.css?v=1779581125" />
 </head>
 <body data-theme="clean" class="sidebar-collapsed">
   <div class="app-layout">
@@ -93,6 +93,11 @@
           <button class="settings-action-btn" id="settingsNotifBtn">Test Desktop Notification</button>
           <p class="settings-hint">Requires browser permission. Grant via browser address bar.</p>
         </section>
+        <section class="settings-section" id="pwaInstallSection" style="display:none">
+          <h3>📲 Install App</h3>
+          <button class="settings-action-btn" id="pwaInstallBtn">Install Concierge to Home Screen</button>
+          <p class="settings-hint">Installs as a standalone app. Faster, full-screen, no browser chrome.</p>
+        </section>
         <section class="settings-section">
           <h3>🔌 Connection</h3>
           <div class="settings-row">
@@ -115,6 +120,6 @@
   <!-- Sidebar overlay (mobile) -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <script src="app.js?v=1779580912"></script>
+  <script src="app.js?v=1779581125"></script>
 </body>
 </html>
