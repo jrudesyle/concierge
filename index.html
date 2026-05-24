@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="/assets/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1779581386" />
+  <link rel="stylesheet" href="style.css?v=1779589700" />
 </head>
 <body data-theme="clean">
   <div class="app-layout">
@@ -21,7 +21,6 @@
       <div class="header-left">
         <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">☰</button>
         <h1>🔧 Concierge</h1>
-        <span class="header-subtitle">Agent Command Center</span>
       </div>
       <div class="header-right">
         <span class="clock" id="clock"></span>
@@ -29,43 +28,45 @@
       </div>
     </header>
 
-    <!-- ── Body Layout ── -->
+    <!-- ── Main Content ── -->
     <div class="body-layout">
-      <!-- ── Sidebar ── -->
+      <!-- Sidebar (desktop) -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <span>Projects</span>
           <span class="project-count" id="agentCount">0</span>
         </div>
-        <div class="sidebar-list" id="sidebarList">
-          <!-- Sidebar items injected by JS -->
-        </div>
+        <div class="sidebar-list" id="sidebarList"></div>
         <div class="sidebar-footer">
           <button class="sidebar-add-btn" id="addAgentBtn">＋ New Project</button>
         </div>
       </aside>
 
-      <!-- ── Main Content ── -->
+      <!-- Main Content -->
       <main class="dashboard-main" id="dashboardMain">
+        <!-- Project selector (mobile) -->
+        <div class="project-strip" id="projectStrip"></div>
         <!-- Tab panes injected by JS -->
-
       </main>
-    </div>
-  </div>
 
-  <!-- Bottom Nav (mobile) -->
-  <nav class="bottom-nav" id="bottomNav">
-    <div class="bottom-nav-list" id="bottomNavList">
-      <!-- injected by JS -->
+      <!-- Settings panel (replaces main on settings tab) -->
+      <div class="settings-pane" id="settingsPane" style="display:none">
+        <div class="settings-pane-header">
+          <h2>⚙️ Settings</h2>
+          <button class="settings-pane-close" id="settingsPaneClose">✕</button>
+        </div>
+        <div class="settings-pane-scroll">
+          <!-- project list or detail shown here -->
+          <div id="settingsContent"></div>
+        </div>
+      </div>
     </div>
-  </nav>
 
-  <!-- Bottom Sheet (mobile info panel) -->
-  <div class="bottom-sheet" id="bottomSheet">
-    <div class="bottom-sheet-handle"></div>
-    <div class="bottom-sheet-content" id="bottomSheetContent">
-      <!-- injected by JS -->
-    </div>
+    <!-- Bottom tabs (mobile) -->
+    <nav class="bottom-tabs" id="bottomTabs">
+      <button class="bottom-tab active" data-tab="chat">💬 Chat</button>
+      <button class="bottom-tab" data-tab="settings">⚙️ Settings</button>
+    </nav>
   </div>
 
   <!-- Toast container -->
@@ -120,6 +121,6 @@
   <!-- Sidebar overlay (mobile) -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <script src="app.js?v=1779581386"></script>
+  <script src="app.js?v=1779589700"></script>
 </body>
 </html>

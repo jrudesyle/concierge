@@ -23,11 +23,6 @@ const connectionText = document.querySelector('#settingsConnection span:last-chi
 const clockEl = $('clock');
 const notifBtn = $('settingsNotifBtn');
 const sidebarToggle = $('sidebarToggle');
-const projectStrip = $('projectStrip');
-const bottomTabs = document.querySelectorAll('.bottom-tab');
-const settingsPane = $('settingsPane');
-const settingsContent = $('settingsContent');
-let activeTab = 'chat';
 const addAgentBtn = $('addAgentBtn');
 
 // ── Clock ──
@@ -245,43 +240,26 @@ function renderMarkdown(text) {
   return escaped;
 }
 
-// ── Bottom Tab Switching (mobile) ──
-bottomTabs.forEach(function(tab) {
-  tab.addEventListener('click', function() { switchTab(this.dataset.tab); });
+// ── Sidebar Toggle ──
+sidebarToggle.addEventListener('click', () => {
+  const isMobile = window.innerWidth <= 700;
+  if (isMobile) {
+    sidebarEl.classList.toggle('open');
+    overlayEl.classList.toggle('open', sidebarEl.classList.contains('open'));
+  } else {
+    sidebarEl.classList.toggle('collapsed');
+  }
 });
-
-function switchTab(tabName) {
-  activeTab = tabName;
-  bottomTabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === tabName); });
-  if (tabName === 'chat') {
-    main.style.display = 'flex';
-    settingsPane.style.display = 'none';
-    renderProjectStrip();
-    if (currentTab && currentTab !== '_shell') {
-      var input = document.getElementById('chatInput-' + currentTab);
-      if (input) input.focus();
-    }
-  } else {
-    main.style.display = 'none';
-    settingsPane.style.display = 'flex';
-    renderSettings();
+// Close sidebar on mobile when clicking outside or on overlay
+const overlayEl = document.getElementById('sidebarOverlay');
+function closeSidebar() {
+  if (window.innerWidth <= 700 && sidebarEl.classList.contains('open')) {
+    sidebarEl.classList.remove('open');
+    if (overlayEl) overlayEl.classList.remove('open');
   }
 }
-
-function checkLayout() {
-  var wide = window.innerWidth > 700;
-  document.querySelectorAll('.bottom-tabs').forEach(function(el) { el.style.display = wide ? 'none' : 'flex'; });
-  if (wide) {
-    main.style.display = 'flex';
-    settingsPane.style.display = 'none';
-    sidebarEl.style.display = 'flex';
-  } else {
-    sidebarEl.style.display = 'none';
-    switchTab(activeTab);
-  }
-}
-window.addEventListener('resize', checkLayout);
-setTimeout(checkLayout, 50);
+main.addEventListener('click', closeSidebar);
+if (overlayEl) overlayEl.addEventListener('click', closeSidebar);
 
 // ── Notifications ──
 async function enableNotifications() {
@@ -348,7 +326,9 @@ function renderSidebar() {
     return;
   }
 
+  renderBottomNav();
 
+  // Validate current tab
   if (!currentTab || !state.agents[currentTab]) {
     currentTab = agents[0].id;
   }
@@ -547,124 +527,6 @@ function renderFileList(container, agentId, files, basePath) {
   });
 }
 
-// ── Project Strip (mobile chip selector) ──
-function renderProjectStrip() {
-  if (!projectStrip) return;
-  if (window.innerWidth > 700) { projectStrip.style.display = 'none'; return; }
-  projectStrip.style.display = 'flex';
-  var agents = Object.values(state.agents);
-  projectStrip.innerHTML = agents.map(function(a) {
-    var emoji = a.emoji || '📁';
-    var active = a.id === currentTab ? 'active' : '';
-    return '<button class="strip-chip ' + active + '" data-agent="' + a.id + '">' + emoji + ' ' + (a.label || a.id).replace(/^.?.?.?.?.? /, '') + '</button>';
-  }).join('');
-  projectStrip.querySelectorAll('.strip-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() { selectAgent(this.dataset.agent); });
-  });
-}
-
-// ── Settings Pane ──
-function renderSettings() {
-  if (!settingsContent) return;
-  var detailAgent = settingsContent.dataset.detailAgent;
-  if (detailAgent && state.agents[detailAgent]) {
-    renderSettingsDetail(detailAgent);
-    return;
-  }
-  settingsContent.innerHTML = '';
-  var agents = Object.values(state.agents);
-  var list = document.createElement('div');
-  list.className = 'settings-projects';
-  agents.forEach(function(a) {
-    var emoji = a.emoji || '📁';
-    var statusDot = a.status === 'active' ? '🟢' : a.status === 'error' ? '🔴' : '⚪';
-    var item = document.createElement('button');
-    item.className = 'settings-project-item';
-    item.innerHTML = '<span class="spi-dot">' + statusDot + '</span><span class="spi-label">' + emoji + ' ' + (a.label || a.id) + '</span><span class="spi-arrow">›</span>';
-    item.addEventListener('click', function() { renderSettingsDetail(a.id); });
-    list.appendChild(item);
-  });
-  settingsContent.appendChild(list);
-  var newBtn = document.createElement('button');
-  newBtn.className = 'settings-new-btn';
-  newBtn.textContent = '＋ New Project';
-  newBtn.addEventListener('click', showCreateProjectModal);
-  settingsContent.appendChild(newBtn);
-  var appSection = document.createElement('div');
-  appSection.className = 'settings-app-section';
-  appSection.innerHTML = '<div class="settings-app-title">App</div>' +
-    '<button class="settings-app-btn" id="settingsThemeBtn">🎨 Theme</button>' +
-    '<button class="settings-app-btn" id="settingsNotifBtn2">🔔 Notification Test</button>' +
-    '<button class="settings-app-btn" id="pwaInstallBtn2" style="display:none">📲 Install</button>';
-  settingsContent.appendChild(appSection);
-  var themeBtn = document.getElementById('settingsThemeBtn');
-  if (themeBtn) themeBtn.addEventListener('click', function() { document.getElementById('settingsBtn').click(); });
-  var notifBtn2 = document.getElementById('settingsNotifBtn2');
-  if (notifBtn2) notifBtn2.addEventListener('click', function() {
-    if (notifEnabled) { sendDesktopNotif('🔔 Test', 'Notifications work!'); showToast('🔔', 'Test', 'Sent!'); }
-    else { showToast('⚠️', 'Notifications', 'Enable in browser permissions.'); }
-  });
-  if (typeof installPromptEvent !== 'undefined' && installPromptEvent) {
-    var pwaBtn = document.getElementById('pwaInstallBtn2');
-    if (pwaBtn) { pwaBtn.style.display = 'flex'; pwaBtn.addEventListener('click', function() {
-      installPromptEvent.prompt();
-      installPromptEvent.userChoice.then(function(result) {
-        if (result.outcome === 'accepted') { pwaBtn.style.display = 'none'; showToast('✅', 'Installed!', ''); }
-        installPromptEvent = null;
-      });
-    });}
-  }
-}
-
-function renderSettingsDetail(agentId) {
-  var a = state.agents[agentId];
-  if (!a) return;
-  settingsContent.dataset.detailAgent = agentId;
-  var backBtn = '<button class="settings-detail-back">‹ Back to Projects</button>';
-  var header = '<div class="settings-detail-header">' + (a.emoji || '📁') + ' ' + (a.label || a.id) + '</div>';
-  var tasksSection = '<div class="settings-section-title">📋 Tasks</div>' +
-    '<div class="task-list" id="taskList-' + agentId + '"><div class="empty-state" style="padding:10px"><p>Loading...</p></div></div>' +
-    '<button class="settings-add-btn" id="addTaskBtn-' + agentId + '">＋ Add Task</button>';
-  var saHTML = '<div class="settings-section-title">⚡ Sub-Agents</div><div class="subagent-grid">';
-  if (a.subAgents && a.subAgents.length > 0) {
-    saHTML += a.subAgents.map(function(sa) {
-      return '<div class="settings-sa-item">⚡ ' + sa.label + '<br><small>' + (sa.description || '') + '</small></div>';
-    }).join('');
-  } else {
-    saHTML += '<div class="empty-state" style="padding:10px;font-size:0.82rem"><p>No sub-agents</p></div>';
-  }
-  saHTML += '</div><button class="settings-add-btn" id="createSubAgentBtn-' + agentId + '">＋ Custom Sub-Agent</button>';
-  var ctxSection = '<div class="settings-section-title">📄 Context Files</div><div class="context-files" id="ctxFiles-' + agentId + '"><div class="empty-state"><p>Loading...</p></div></div>';
-  settingsContent.innerHTML = backBtn + header + tasksSection + saHTML + ctxSection;
-  settingsContent.querySelector('.settings-detail-back').addEventListener('click', function() {
-    settingsContent.dataset.detailAgent = '';
-    renderSettings();
-  });
-  renderTasks(agentId);
-  loadContextFiles(agentId);
-  var addTaskBtn = document.getElementById('addTaskBtn-' + agentId);
-  if (addTaskBtn) addTaskBtn.addEventListener('click', function() {
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;gap:4px;padding:4px 0';
-    wrapper.innerHTML = '<input type="text" id="inlineTaskInput" class="task-add-input" placeholder="New task..." />' +
-      '<button class="task-add-confirm" id="inlineTaskConfirm">Add</button>';
-    this.parentNode.insertBefore(wrapper, this);
-    var inp = document.getElementById('inlineTaskInput');
-    inp.focus();
-    document.getElementById('inlineTaskConfirm').addEventListener('click', function() {
-      var text = inp.value.trim();
-      if (!text) return;
-      apiFetch('/api/projects/' + agentId + '/tasks/add', {
-        method: 'POST',
-        body: JSON.stringify({ text: text }),
-      }).then(function(r) { if (r && r.ok) { wrapper.remove(); renderTasks(agentId); } });
-    });
-    inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('inlineTaskConfirm').click(); });
-  });
-  var createBtn = document.getElementById('createSubAgentBtn-' + agentId);
-  if (createBtn) createBtn.addEventListener('click', function() { showCreateSubAgentForm(agentId); });
-}
-
 // ── Render Panes ──
 // ── Render Panes ──
 function renderPanes() {
@@ -697,32 +559,83 @@ function renderPanes() {
             '<span class="sa-desc">' + sa.description + '</span></button>';
         }).join('');
 
-  // ── Create chat pane ──
-  pane.innerHTML =
-    '<div class="chat-pane">' +
-      '<div class="chat-messages" id="chatMsgs-' + a.id + '">' +
-        '<div class="chat-empty">' +
-          '<div class="big-icon">💬</div>' +
-          '<p>Start a conversation — ask questions, review code, or get help.</p>' +
+    pane.innerHTML =
+      '<div class="pane-inner">' +
+        // Main Chat Area
+        '<div class="chat-area">' +
+          '<div class="chat-header-bar">' +
+            '<span class="chat-header-title">' + (a.emoji || '') + ' ' + labelClean + '</span>' +
+            '<div class="chat-header-actions">' +
+              '<span class="pane-status-tag ' + statusClass + '">' + (a.statusLabel || '') + '</span>' +
+              '<button class="btn-info-toggle" data-agent="' + a.id + '" title="Toggle project info">📋</button>' +
+              '<button class="chat-fs-btn" data-agent="' + a.id + '" title="Full screen">⛶</button>' +
+              '<button class="btn-icon btn-del-agent" data-agent="' + a.id + '" title="Delete">🗑️</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="chat-box">' +
+            '<div class="chat-messages" id="chatMsgs-' + a.id + '">' +
+              '<div class="chat-empty">' +
+                '<div class="big-icon">💬</div>' +
+                '<p>Start a conversation — ask questions, review code, or get help.</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="chat-input-bar">' +
+              '<input type="text" class="chat-input" id="chatInput-' + a.id + '" data-agent="' + a.id + '" placeholder="Ask about ' + labelClean + '..." />' +
+              '<button class="chat-send-btn" data-agent="' + a.id + '">Send</button>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
-      '</div>' +
-      '<div class="chat-input-bar">' +
-        '<input type="text" class="chat-input" id="chatInput-' + a.id + '" data-agent="' + a.id + '" placeholder="Ask about ' + labelClean + '..." />' +
-        '<button class="chat-send-btn" data-agent="' + a.id + '">Send</button>' +
-      '</div>' +
-    '</div>';
+        // Info Panel (slide-out from right)
+        '<div class="info-panel" id="infoPanel-' + a.id + '" style="display:none">' +
+          '<div class="info-panel-header">' +
+            '<span>📋 Project Info</span>' +
+            '<button class="btn-info-close" data-agent="' + a.id + '">✕</button>' +
+          '</div>' +
+          '<div class="info-panel-body">' +
+            (a.context ? '<div class="context-panel"><strong>' + (a.description || '') + '</strong> ' + a.context + '</div>' : '') +
+            (a.topic ? '<div class="context-panel topic-ref">📁 Topic: <code>' + a.topic + '</code></div>' : '') +
+            '<div class="section-header">' +
+              '<h3>📋 Tasks</h3>' +
+              '<button class="btn-icon btn-add-task" data-agent="' + a.id + '" title="Add task">＋</button>' +
+            '</div>' +
+            '<div class="task-list" id="taskList-' + a.id + '">' +
+              '<div class="empty-state" style="padding:10px"><p>Loading...</p></div>' +
+            '</div>' +
+            '<div class="section-header">' +
+              '<h3>⚡ Sub-Agents</h3>' +
+              '<button class="btn-icon btn-create-agent" data-agent="' + a.id + '" title="Create custom sub-agent">＋</button>' +
+            '</div>' +
+            '<div class="subagent-grid" id="subagents-' + a.id + '">' + saHTML + '</div>' +
+            '<div class="section-header">' +
+              '<h3>📄 Context Files</h3>' +
+              '<button class="btn-icon btn-reload-files" data-agent="' + a.id + '" title="Reload files">🔄</button>' +
+            '</div>' +
+            '<div class="context-files" id="ctxFiles-' + a.id + '">' +
+              '<div class="empty-state"><p>Loading...</p></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
     main.appendChild(pane);
   });
 
-  // Load context files and tasks for visible agent
-  if (currentTab && currentTab !== '_shell' && currentTab !== '_global') {
-    loadContextFiles(currentTab);
-    renderTasks(currentTab);
-  }
+  // Bind info toggle buttons
+  document.querySelectorAll('.btn-info-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      toggleInfoPanel(this.dataset.agent);
+    });
+  });
+  document.querySelectorAll('.btn-info-close').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      closeInfoPanel(this.dataset.agent);
+    });
+  });
 
-  // Render chat
-  renderChat(currentTab);
+  // Bind chat fullscreen
+  document.querySelectorAll('.chat-fs-btn').forEach(function(btn) {
+    btn.addEventListener('click', toggleChatFullscreen);
+  });
 
   // Bind chat send
   document.querySelectorAll('.chat-send-btn').forEach(function(btn) {
@@ -738,14 +651,77 @@ function renderPanes() {
     });
   });
 
+  // Bind delete
+  document.querySelectorAll('.btn-del-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteAgent(this.dataset.agent); });
+  });
+
+  // Bind add-task (inline form)
+  document.querySelectorAll('.btn-add-task').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var agentId = this.dataset.agent;
+      var list = document.getElementById('taskList-' + agentId);
+      if (!list) return;
+      var existing = list.querySelector('.task-add-form');
+      if (existing) { existing.remove(); return; }
+      var form = document.createElement('div');
+      form.className = 'task-add-form';
+      form.innerHTML = '<input type="text" class="task-add-input" placeholder="New task..." />' +
+        '<button class="task-add-confirm">Add</button>' +
+        '<button class="task-cancel-btn">✕</button>';
+      list.appendChild(form);
+      var input = form.querySelector('.task-add-input');
+      input.focus();
+      function addTask() {
+        var text = input.value.trim();
+        if (!text) return;
+        apiFetch('/api/projects/' + agentId + '/tasks/add', {
+          method: 'POST',
+          body: JSON.stringify({ text: text }),
+        }).then(function(result) {
+          if (result && result.ok) { form.remove(); renderTasks(agentId); }
+        });
+      }
+      form.querySelector('.task-add-confirm').addEventListener('click', addTask);
+      form.querySelector('.task-cancel-btn').addEventListener('click', function() { form.remove(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addTask();
+        if (e.key === 'Escape') form.remove();
+      });
+    });
+  });
+
+  // Bind reload-files
+  document.querySelectorAll('.btn-reload-files').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var agentId = this.dataset.agent;
+      loadContextFiles(agentId);
+      renderTasks(agentId);
+    });
+  });
+
+  // Bind subagent spawn
+  document.querySelectorAll('.subagent-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      spawnSubAgent(this.dataset.agent, this.dataset.subagent, this);
+    });
+  });
+
+  // Bind create custom agent
+  document.querySelectorAll('.btn-create-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showCreateSubAgentForm(this.dataset.agent);
+    });
+  });
+
+  // Load context files + tasks for visible agent
+  if (currentTab && currentTab !== '_shell' && currentTab !== '_global') {
+    loadContextFiles(currentTab);
+    renderTasks(currentTab);
+  }
   var visibleInput = document.getElementById('chatInput-' + currentTab);
   if (visibleInput) visibleInput.focus();
 }
-
-// ── Sidebar Toggle (desktop) ──
-sidebarToggle.addEventListener('click', function() {
-  sidebarEl.classList.toggle('collapsed');
-});
 
 function toggleChatFullscreen() {
   const isFs = document.body.classList.toggle('chat-fullscreen');
@@ -779,7 +755,226 @@ async function loadContextFiles(agentId) {
   renderFileList(container, agentId, data.files, '/api/projects/' + agentId + '/context');
 }
 
+// ── Bottom Nav (mobile) ──
+function renderBottomNav() {
+  const list = document.getElementById('bottomNavList');
+  if (!list) return;
 
+  var items = [
+    { id: '_shell', icon: '⌨️', label: 'Shell' },
+    { id: '_global', icon: '🌐', label: 'Global' },
+  ];
+
+  Object.values(state.agents).forEach(function(a) {
+    var emoji = a.emoji || '📁';
+    items.push({ id: a.id, icon: emoji, label: (a.label || a.id).substring(0, 6) });
+  });
+
+  list.innerHTML = items.map(function(item) {
+    var active = item.id === currentTab ? 'active' : '';
+    return '<button class="bottom-nav-item ' + active + '" data-agent="' + item.id + '">' +
+      '<span class="bni-icon">' + item.icon + '</span>' +
+      '<span class="bni-label">' + item.label + '</span></button>';
+  }).join('');
+
+  list.querySelectorAll('.bottom-nav-item').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      selectAgent(this.dataset.agent);
+    });
+  });
+}
+
+// Update bottom nav active state when switching
+function updateBottomNav() {
+  document.querySelectorAll('.bottom-nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.agent === currentTab);
+  });
+}
+
+// ── Mobile Bottom Sheet ──
+function openBottomSheet(agentId) {
+  const sheet = document.getElementById('bottomSheet');
+  const content = document.getElementById('bottomSheetContent');
+  if (!sheet || !content) return;
+
+  // Copy info panel content into sheet
+  const infoPanel = document.getElementById('infoPanel-' + agentId);
+  if (infoPanel) {
+    content.innerHTML = infoPanel.innerHTML;
+    // Re-bind interactive elements inside the sheet
+    bindSheetElements(agentId);
+  } else {
+    content.innerHTML = '<div class="empty-state" style="padding:20px"><p>Loading...</p></div>';
+  }
+
+  sheet.classList.add('open');
+
+  // Close sheet on backdrop click
+  sheet.addEventListener('click', function(e) {
+    if (e.target === sheet) sheet.classList.remove('open');
+  });
+}
+
+function closeBottomSheet() {
+  document.getElementById('bottomSheet').classList.remove('open');
+}
+
+function bindSheetElements(agentId) {
+  // Bind add-task (inline)
+  document.querySelectorAll('#bottomSheetContent .btn-add-task').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var list = document.getElementById('bottomSheetContent .task-list');
+      // trigger the same logic by looking for the original btn
+      // Actually, just delegate — same as above
+      var agentId = this.dataset.agent;
+      var list = document.getElementById('taskList-' + agentId);
+      if (!list) return;
+      var existing = list.querySelector('.task-add-form');
+      if (existing) { existing.remove(); return; }
+      var form = document.createElement('div');
+      form.className = 'task-add-form';
+      form.innerHTML = '<input type="text" class="task-add-input" placeholder="New task..." />' +
+        '<button class="task-add-confirm">Add</button>' +
+        '<button class="task-cancel-btn">✕</button>';
+      list.appendChild(form);
+      var input = form.querySelector('.task-add-input');
+      input.focus();
+      function addTask() {
+        var text = input.value.trim();
+        if (!text) return;
+        apiFetch('/api/projects/' + agentId + '/tasks/add', {
+          method: 'POST',
+          body: JSON.stringify({ text: text }),
+        }).then(function(result) {
+          if (result && result.ok) { form.remove(); renderTasks(agentId); }
+        });
+      }
+      form.querySelector('.task-add-confirm').addEventListener('click', addTask);
+      form.querySelector('.task-cancel-btn').addEventListener('click', function() { form.remove(); });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') addTask();
+        if (e.key === 'Escape') form.remove();
+      });
+    });
+  });
+  // Bind reload-files
+  document.querySelectorAll('#bottomSheetContent .btn-reload-files').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      loadContextFiles(agentId);
+      renderTasks(agentId);
+    });
+  });
+  // Bind subagent spawn
+  document.querySelectorAll('#bottomSheetContent .subagent-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      spawnSubAgent(agentId, this.dataset.subagent, this);
+    });
+  });
+  // Bind create-agent
+  document.querySelectorAll('#bottomSheetContent .btn-create-agent').forEach(function(btn) {
+    btn.addEventListener('click', function() { showCreateSubAgentForm(agentId); });
+  });
+  // Bind context file expand
+  document.querySelectorAll('#bottomSheetContent .ctx-file-header').forEach(function(el) {
+    el.addEventListener('click', async function() {
+      var parent = this.parentElement;
+      var editor = parent.querySelector('.ctx-file-editor');
+      var file = parent.dataset.file;
+      var base = parent.dataset.base || ('/api/projects/' + agentId + '/context');
+      if (editor.style.display === 'block') {
+        editor.style.display = 'none';
+        return;
+      }
+      var fileData = await apiFetch(base + '/' + file);
+      if (fileData && fileData.content !== undefined) {
+        var textarea = editor.querySelector('.ctx-textarea');
+        if (textarea) textarea.value = fileData.content;
+        editor.style.display = 'block';
+      }
+    });
+  });
+  // Save
+  document.querySelectorAll('#bottomSheetContent .ctx-save-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var file = this.dataset.file;
+      var base = this.dataset.base || ('/api/projects/' + agentId + '/context');
+      var editor = this.closest('.ctx-file-editor');
+      var textarea = editor ? editor.querySelector('.ctx-textarea') : null;
+      if (!textarea) return;
+      var result = await apiFetch(base + '/' + file, {
+        method: 'PUT',
+        body: JSON.stringify({ content: textarea.value }),
+      });
+      if (result && result.ok) {
+        showToast('💾', 'Saved', file, 2000);
+        if (editor) editor.style.display = 'none';
+      } else {
+        showToast('❌', 'Save failed', file, 3000);
+      }
+    });
+  });
+  // Cancel
+  document.querySelectorAll('#bottomSheetContent .ctx-cancel-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var editor = this.closest('.ctx-file-editor');
+      if (editor) editor.style.display = 'none';
+    });
+  });
+  // Load context files and tasks for this agent
+  loadContextFiles(agentId);
+  renderTasks(agentId);
+}
+
+// ── Swipe Gesture Detection ──
+var touchStartX = 0;
+var touchStartY = 0;
+var touchStartTime = 0;
+var isSwiping = false;
+
+document.addEventListener('touchstart', function(e) {
+  // Only track single-finger horizontal swipes in chat area
+  var target = e.target;
+  if (!target.closest('.tab-pane.active')) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+  isSwiping = false;
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+  if (!touchStartX) return;
+  var dx = e.touches[0].clientX - touchStartX;
+  var dy = e.touches[0].clientY - touchStartY;
+
+  // Only horizontal swipes, more than 30px
+  if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    isSwiping = true;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', function(e) {
+  if (!touchStartX || !isSwiping) {
+    touchStartX = 0;
+    return;
+  }
+  var dx = e.changedTouches[0].clientX - touchStartX;
+  var dt = Date.now() - touchStartTime;
+
+  if (Math.abs(dx) > 50 && dt < 500) {
+    // Get list of agents in order
+    var agents = ['_shell', '_global'].concat(Object.keys(state.agents));
+    var idx = agents.indexOf(currentTab);
+    if (dx < 0 && idx < agents.length - 1) {
+      // Swipe left → next
+      selectAgent(agents[idx + 1]);
+    } else if (dx > 0 && idx > 0) {
+      // Swipe right → previous
+      selectAgent(agents[idx - 1]);
+    }
+  }
+  touchStartX = 0;
+  isSwiping = false;
+}, { passive: true });
 
 function renderTasks(agentId) {
   const container = document.getElementById('taskList-' + agentId);
