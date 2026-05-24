@@ -426,13 +426,10 @@ body {
   background: var(--bg);
   min-height: 0;
 }
-  overflow-y: auto;
-  min-width: 0;
-}
 
 /* ── Tab Pane ── */
 .tab-pane { display: none; }
-.tab-pane.active { display: flex; flex: 1; min-height: 0; }
+.tab-pane.active { display: flex; flex: 1; min-height: 0; min-width: 0; height: 100%; }
 .pane-inner { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
 /* Agent header bar */
@@ -1532,6 +1529,27 @@ body {
   flex: 1;
   min-height: 0;
 }
+.chat-pane .chat-messages {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+.chat-pane .chat-input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
 
 /* ── Responsive ── */ */
 @media (max-width: 800px) {
@@ -1634,31 +1652,29 @@ body {
 /* ── Project Strip (mobile chip selector) ── */
 .project-strip {
   display: none;
-  overflow-x: auto;
-  gap: 6px;
-  padding: 6px 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-.project-strip::-webkit-scrollbar { display: none; }
-.strip-chip {
-  flex-shrink: 0;
-  padding: 4px 12px;
-  border-radius: 20px;
+.strip-current {
+  font-size: 0.9rem;
+  font-weight: 600;
+  flex: 1;
+}
+.strip-switch-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
   background: var(--surface2);
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--text-dim);
   font-size: 0.82rem;
   cursor: pointer;
-  transition: .12s;
-  white-space: nowrap;
   min-height: 36px;
 }
-.strip-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.strip-chip:active { opacity: .7; }
+.strip-switch-btn:active { background: var(--surface3); }
 
 /* ── Settings Pane ── */
 .settings-pane {

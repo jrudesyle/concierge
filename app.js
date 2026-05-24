@@ -552,15 +552,14 @@ function renderProjectStrip() {
   if (!projectStrip) return;
   if (window.innerWidth > 700) { projectStrip.style.display = 'none'; return; }
   projectStrip.style.display = 'flex';
-  var agents = Object.values(state.agents);
-  projectStrip.innerHTML = agents.map(function(a) {
-    var emoji = a.emoji || '📁';
-    var active = a.id === currentTab ? 'active' : '';
-    return '<button class="strip-chip ' + active + '" data-agent="' + a.id + '">' + emoji + ' ' + (a.label || a.id).replace(/^.?.?.?.?.? /, '') + '</button>';
-  }).join('');
-  projectStrip.querySelectorAll('.strip-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() { selectAgent(this.dataset.agent); });
-  });
+  var a = currentTab && state.agents[currentTab] ? state.agents[currentTab] : null;
+  if (!a) { projectStrip.innerHTML = ''; return; }
+  var emoji = a.emoji || '💬';
+  projectStrip.innerHTML =
+    '<span class="strip-current">' + emoji + ' ' + (a.label || a.id) + '</span>' +
+    '<button class="strip-switch-btn" id="switchProjBtn">Switch</button>';
+  var btn = document.getElementById('switchProjBtn');
+  if (btn) btn.addEventListener('click', function() { switchTab('settings'); });
 }
 
 // ── Settings Pane ──
