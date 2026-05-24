@@ -1159,6 +1159,7 @@ function showCreateProjectModal() {
         description: $('#newProjDesc').value.trim() || '',
         context: $('#newProjContext').value.trim() || '',
         topic: $('#newProjTopic').value.trim() || undefined,
+        template: $('#newProjTemplate').value || undefined,
       }),
     });
     overlay.remove();

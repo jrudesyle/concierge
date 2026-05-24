@@ -893,6 +893,32 @@ async function handle(req, res) {
     return;
   }
 
+  // GET /api/templates — list available project templates
+  if (method === 'GET' && pathParts.length === 2 && pathParts[0] === 'api' && pathParts[1] === 'templates') {
+    var templatesDir = path.join(PROJECTS_DIR, '_templates');
+    try {
+      var items = fs.readdirSync(templatesDir, { withFileTypes: true });
+      var templates = [];
+      items.forEach(function(item) {
+        if (item.isDirectory()) {
+          var metaPath = path.join(templatesDir, item.name, 'template.json');
+          if (fs.existsSync(metaPath)) {
+            try {
+              var meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+              templates.push({ id: item.name, label: meta.label, description: meta.description });
+            } catch (_) {}
+          }
+        }
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ templates: templates }));
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // POST /api/projects — create a new project
   if (method === 'POST' && pathParts.length === 2 && pathParts[0] === 'api' && pathParts[1] === 'projects') {
     const body = await parseBody(req);
@@ -909,12 +935,50 @@ async function handle(req, res) {
         res.end(JSON.stringify({ error: 'Project already exists' }));
         return;
       }
-      // Create project directories and default files
+      // Create project directories
       fs.mkdirSync(path.join(projDir, 'context'), { recursive: true });
-      fs.writeFileSync(path.join(projDir, 'README.md'), '# ' + body.label + '\n\n' + (body.description || ''), 'utf8');
+
+      var subAgentList = [];
+      var contextFilesCopied = [];
+
+      // If using a template, copy files and sub-agents from it
+      if (body.template) {
+        var templateDir = path.join(PROJECTS_DIR, '_templates', body.template);
+        var templateMeta = path.join(templateDir, 'template.json');
+        try {
+          if (fs.existsSync(templateMeta)) {
+            var meta = JSON.parse(fs.readFileSync(templateMeta, 'utf8'));
+            subAgentList = meta.subAgents || [];
+            // Copy context files, replacing template vars
+            var ctxDir = path.join(templateDir, 'context');
+            if (fs.existsSync(ctxDir)) {
+              var files = fs.readdirSync(ctxDir).filter(function(f) { return f.endsWith('.md'); });
+              files.forEach(function(f) {
+                var src = path.join(ctxDir, f);
+                var dest = path.join(projDir, 'context', f);
+                var content = fs.readFileSync(src, 'utf8');
+                // Replace template variables
+                content = content.replace(/\{\{APP_NAME\}\}/g, body.label);
+                content = content.replace(/\{\{APP_DESCRIPTION\}\}/g, body.description || '');
+                content = content.replace(/\{\{APP_TYPE\}\}/g, meta.label || 'Application');
+                content = content.replace(/\{\{KEY_AREAS\}\}/g, body.keyAreas || 'Authentication, data storage, API security');
+                fs.writeFileSync(dest, content, 'utf8');
+                contextFilesCopied.push(f);
+              });
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Always write default files if not provided by template
+      if (contextFilesCopied.indexOf('README.md') < 0) {
+        fs.writeFileSync(path.join(projDir, 'README.md'), '# ' + body.label + '\n\n' + (body.description || ''), 'utf8');
+      }
+      if (contextFilesCopied.indexOf('tasks.md') < 0) {
+        fs.writeFileSync(path.join(projDir, 'tasks.md'), '# Tasks\n\n## Pending\n- (none)\n\n## In Progress\n- (none)\n\n## Done\n- (none)\n', 'utf8');
+      }
       fs.writeFileSync(path.join(projDir, 'notes.md'), '# Notes\n\n', 'utf8');
       fs.writeFileSync(path.join(projDir, 'decisions.md'), '# Decisions\n- ' + new Date().toISOString().slice(0, 10) + ': Project created\n', 'utf8');
-      fs.writeFileSync(path.join(projDir, 'tasks.md'), '# Tasks\n\n', 'utf8');
 
       // Register as an agent in the dashboard
       const hasEmoji = /^\p{Emoji}/u.test(body.label);
@@ -928,7 +992,7 @@ async function handle(req, res) {
         topic: body.topic || body.label,
         context: body.context || 'Project created',
         subtasks: [],
-        subAgents: [],
+        subAgents: subAgentList,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
