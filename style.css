@@ -420,17 +420,20 @@ body {
 /* ── Main Content ── */
 .dashboard-main {
   flex: 1;
-  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden;
+  background: var(--bg);
+  min-height: 0;
+}
   overflow-y: auto;
   min-width: 0;
 }
 
 /* ── Tab Pane ── */
-.tab-pane { display: none; flex-direction: column; gap: 18px; }
-.tab-pane.active { display: flex; }
+.tab-pane { display: none; }
+.tab-pane.active { display: flex; flex: 1; min-height: 0; }
+.pane-inner { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
 /* Agent header bar */
 .pane-header {
